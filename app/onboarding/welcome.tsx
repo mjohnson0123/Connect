@@ -27,6 +27,7 @@ export default function Welcome() {
           <Text style={styles.rule}>· No pitches, no selling, no dating</Text>
         </View>
         <Button label="Get started" onPress={() => router.push('/onboarding/signup')} />
+        <Button label="I already have an account" variant="quietOnInk" onPress={() => router.push('/onboarding/signin')} />
         <Text style={styles.legal}>
           18+ only. By continuing you agree to the Terms of Service, the no-solicitation
           policy, and the Privacy Policy.

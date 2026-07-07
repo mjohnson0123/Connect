@@ -76,9 +76,13 @@ launch/foreground/every minute, standing in for the backend's scheduled retentio
 This MVP is intentionally client-complete with a mocked data layer. A production
 release replaces/adds:
 
-- **Backend + real auth** — email/password *and* Sign in with Apple (Guideline 4.8);
-  server-side enforcement of every rule the client enforces (filtering, rate limits,
-  visibility), since the client alone is never a security boundary.
+- **Backend + real auth.** Sign-in works today, device-local (database disconnected):
+  direct email/password (SHA-256-hashed locally — testing only) and a **Google
+  sign-in seam** (`src/lib/auth.ts`) that is simulated until Google Cloud OAuth
+  client IDs and a token-validating backend exist. When Google goes real, ship
+  **Sign in with Apple** beside it (Guideline 4.8). Server-side enforcement of every
+  rule the client enforces (filtering, rate limits, visibility) comes with the
+  backend, since the client alone is never a security boundary.
 - **Real selfie liveness service** with encrypted image storage scoped to the
   verification pipeline and deletion after verification (§5.1, §7).
 - **Push notifications** (request/accept/message/check-in-ending) — copy stays at the

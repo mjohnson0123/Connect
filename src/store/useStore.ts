@@ -27,9 +27,22 @@ import { SEED_PATTERNS, SEED_USERS, seedCheckIns } from './seed';
  * (rate limits, double opt-in, expiry, strikes) live here, not in screens.
  */
 
+export type AuthProvider = 'password' | 'google';
+
+/** Local-only account record while the database is disconnected (see src/lib/auth.ts). */
+export interface LocalAccount {
+  email: string;
+  /** null for OAuth providers. */
+  passwordHash: string | null;
+  provider: AuthProvider;
+}
+
 interface AppState {
   me: User | null;
-  /** Simulated auth/session — set after signup gate passes. */
+  account: LocalAccount | null;
+  /** Session flag: sign-out keeps the account + profile; deletion removes both. */
+  signedIn: boolean;
+  /** @deprecated superseded by account.email; kept for shape stability. */
   emailOnFile: string | null;
   users: User[];
   patterns: TripPattern[];
@@ -49,7 +62,9 @@ interface AppState {
   ensureDemoInbound: () => void;
   sweep: () => void;
 
-  signUp: (email: string, dob: Date) => string | null;
+  signUp: (email: string, dob: Date, auth: { passwordHash: string | null; provider: AuthProvider }) => string | null;
+  signIn: (email: string, passwordHash: string | null, provider: AuthProvider) => string | null;
+  signOut: () => void;
   completeVerification: () => void;
   saveProfile: (p: Pick<User, 'displayName' | 'photo' | 'headline' | 'bio' | 'reasonTags' | 'industryTags'>) => void;
   deleteAccount: () => void;
@@ -86,6 +101,8 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       me: null,
+      account: null,
+      signedIn: false,
       emailOnFile: null,
       users: [],
       patterns: [],
@@ -163,11 +180,18 @@ export const useStore = create<AppState>()(
         });
       },
 
-      signUp: (email, dob) => {
+      signUp: (email, dob, auth) => {
         const age = (Date.now() - dob.getTime()) / (365.25 * DAY);
         if (age < 18) return 'Commuter Connect is for adults 18 and over.';
+        const normalized = email.trim().toLowerCase();
+        const existing = get().account;
+        if (existing && existing.email === normalized) {
+          return 'An account with this email already exists — sign in instead.';
+        }
         set({
-          emailOnFile: email,
+          account: { email: normalized, passwordHash: auth.passwordHash, provider: auth.provider },
+          signedIn: true,
+          emailOnFile: normalized,
           me: {
             id: ME_ID,
             displayName: '',
@@ -182,6 +206,31 @@ export const useStore = create<AppState>()(
           },
         });
         return null;
+      },
+
+      signIn: (email, passwordHash, provider) => {
+        const account = get().account;
+        const normalized = email.trim().toLowerCase();
+        if (!account || account.email !== normalized) {
+          return 'NO_ACCOUNT';
+        }
+        if (provider === 'password') {
+          if (account.provider !== 'password' || !account.passwordHash) {
+            return 'This account uses Google sign-in — use “Continue with Google”.';
+          }
+          if (account.passwordHash !== passwordHash) {
+            return 'That email and password don’t match.';
+          }
+        } else if (account.provider !== 'google') {
+          return 'This account uses a password — sign in with email and password.';
+        }
+        set({ signedIn: true });
+        return null;
+      },
+
+      signOut: () => {
+        // Session ends; the account, profile, and data stay for the next sign-in.
+        set({ signedIn: false });
       },
 
       completeVerification: () => {
@@ -200,6 +249,8 @@ export const useStore = create<AppState>()(
         // In-app deletion, not deactivation (App Store 5.1.1v / Play policy).
         set({
           me: null,
+          account: null,
+          signedIn: false,
           emailOnFile: null,
           patterns: get().patterns.filter((p) => p.userId !== ME_ID),
           checkIns: get().checkIns.filter((c) => c.userId !== ME_ID),
@@ -417,7 +468,8 @@ export const useStore = create<AppState>()(
       },
     }),
     {
-      name: 'commuter-connect-v1',
+      name: 'commuter-connect-v2', // bumped when the persisted shape gained account/session
+
       storage: createJSONStorage(() => AsyncStorage),
     },
   ),

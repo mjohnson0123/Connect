@@ -66,6 +66,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding/welcome" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding/signup" options={{ title: 'Create account' }} />
+        <Stack.Screen name="onboarding/signin" options={{ title: 'Sign in' }} />
         <Stack.Screen name="onboarding/verify" options={{ title: 'Verify it’s you' }} />
         <Stack.Screen name="onboarding/profile" options={{ title: 'Your profile' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

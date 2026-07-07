@@ -10,8 +10,9 @@ import { color, space, type } from '../../src/theme/tokens';
 export default function You() {
   const router = useRouter();
   const me = useStore((s) => s.me);
-  const emailOnFile = useStore((s) => s.emailOnFile);
+  const account = useStore((s) => s.account);
   const deleteAccount = useStore((s) => s.deleteAccount);
+  const signOut = useStore((s) => s.signOut);
 
   if (!me) return null;
 
@@ -45,7 +46,10 @@ export default function You() {
               {me.verificationStatus === 'verified' ? <VerifiedBadge /> : null}
             </View>
             <Text style={styles.headline}>{me.headline}</Text>
-            <Text style={styles.mono}>{emailOnFile}</Text>
+            <Text style={styles.mono}>
+              {account?.email}
+              {account?.provider === 'google' ? ' · GOOGLE' : ''}
+            </Text>
           </View>
         </View>
 
@@ -85,6 +89,14 @@ export default function You() {
 
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.section}>ACCOUNT</Text>
+          <Button
+            label="Sign out"
+            variant="quiet"
+            onPress={() => {
+              signOut();
+              router.replace('/onboarding/signin');
+            }}
+          />
           <Button label="Delete account" variant="destructive" onPress={confirmDelete} />
           <Text style={styles.note}>
             Deletion is immediate and permanent. Production also exposes a web deletion
