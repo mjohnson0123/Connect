@@ -11,13 +11,13 @@ import {
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect } from 'react';
-import { AppState, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, AppState, Text, View } from 'react-native';
 import { useStore } from '../src/store/useStore';
 import { color, font } from '../src/theme/tokens';
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Overpass_600SemiBold,
     Overpass_700Bold,
     PublicSans_400Regular,
@@ -28,6 +28,14 @@ export default function RootLayout() {
   });
   const ensureSeeds = useStore((s) => s.ensureSeeds);
   const sweep = useStore((s) => s.sweep);
+  // Never block the app on font loading forever: some environments (Expo
+  // Snack, flaky networks) fail or stall the font fetch. After the grace
+  // period, render with system-font fallbacks instead of hanging on splash.
+  const [fontTimeout, setFontTimeout] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontTimeout(true), 6000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     // Expiry enforcement runs on launch, on foreground, and every minute the
@@ -47,8 +55,23 @@ export default function RootLayout() {
     };
   }, [ensureSeeds, sweep]);
 
-  if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: color.ink }} />;
+  if (!fontsLoaded && !fontError && !fontTimeout) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: color.ink,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+        }}
+      >
+        <Text style={{ color: color.chalk, fontSize: 22, fontWeight: '700', letterSpacing: 2 }}>
+          COMMUTER CONNECT
+        </Text>
+        <ActivityIndicator color={color.amber} />
+      </View>
+    );
   }
 
   return (
