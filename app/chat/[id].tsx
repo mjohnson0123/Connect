@@ -1,0 +1,221 @@
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useRef, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChatMessage } from '../../src/domain/types';
+import { LIMITS } from '../../src/domain/vocab';
+import { formatClock } from '../../src/lib/time';
+import { MY_ID, useStore } from '../../src/store/useStore';
+import { color, font, radius, space, type } from '../../src/theme/tokens';
+
+/**
+ * In-app messaging (PRD §5.5): text-only, filtered before send. Blocked sends
+ * explain themselves to the sender; the thread auto-expires 30 days after the
+ * last message. Block / report / meetup PIN live in the header.
+ */
+export default function Chat() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const users = useStore((s) => s.users);
+  const connections = useStore((s) => s.connections);
+  const messages = useStore((s) => s.messages);
+  const sendMessage = useStore((s) => s.sendMessage);
+  const blockUser = useStore((s) => s.blockUser);
+
+  const [draft, setDraft] = useState('');
+  const [warning, setWarning] = useState<string | null>(null);
+  const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  const conn = connections.find((c) => c.id === id);
+  const other = conn ? users.find((u) => u.id === (conn.userA === MY_ID ? conn.userB : conn.userA)) : null;
+  const thread = messages.filter((m) => m.connectionId === id);
+
+  if (!conn || !other) {
+    return (
+      <View style={styles.gone}>
+        <Text style={type.body}>This conversation is no longer available.</Text>
+      </View>
+    );
+  }
+
+  const send = () => {
+    const text = draft.trim();
+    if (!text) return;
+    const result = sendMessage(conn.id, text);
+    if (!result.ok) {
+      setWarning(result.message ?? 'Message blocked.');
+      return;
+    }
+    setWarning(null);
+    setDraft('');
+    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  };
+
+  const confirmBlock = () => {
+    Alert.alert(
+      `Block ${other.displayName}?`,
+      'They won’t be notified. This conversation closes and you disappear from each other everywhere.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            blockUser(other.id);
+            router.back();
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={90}
+    >
+      <Stack.Screen
+        options={{
+          title: other.displayName,
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', gap: space(4) }}>
+              <Pressable
+                onPress={() => router.push({ pathname: '/meetup/[id]', params: { id: conn.id } })}
+                accessibilityLabel="Meetup PIN verification"
+              >
+                <Text style={styles.headerAction}>PIN</Text>
+              </Pressable>
+              <Pressable onPress={confirmBlock} accessibilityLabel={`Block ${other.displayName}`}>
+                <Text style={[styles.headerAction, { color: color.caution }]}>BLOCK</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push({ pathname: '/report', params: { reportedId: other.id } })}
+                accessibilityLabel={`Report ${other.displayName}`}
+              >
+                <Text style={[styles.headerAction, { color: color.caution }]}>REPORT</Text>
+              </Pressable>
+            </View>
+          ),
+        }}
+      />
+
+      <FlatList
+        ref={listRef}
+        data={thread}
+        keyExtractor={(m) => m.id}
+        contentContainerStyle={{ padding: space(4), gap: space(2) }}
+        ListHeaderComponent={
+          <Text style={styles.expiryNote}>
+            Text-only and in-app. This thread auto-expires {LIMITS.chatExpiryDays} days
+            after the last message. Meeting up? Verify each other with a PIN first.
+          </Text>
+        }
+        renderItem={({ item }) => {
+          const mine = item.senderId === MY_ID;
+          return (
+            <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+              <Text style={mine ? styles.msgMine : styles.msgTheirs}>{item.content}</Text>
+              <Text style={[styles.stamp, mine ? styles.stampMine : null]}>{formatClock(item.createdAt)}</Text>
+            </View>
+          );
+        }}
+      />
+
+      {warning ? (
+        <View style={styles.warning}>
+          <Text style={styles.warningText}>{warning}</Text>
+        </View>
+      ) : null}
+
+      <View style={[styles.composer, { paddingBottom: insets.bottom + space(2) }]}>
+        <TextInput
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Write a message"
+          placeholderTextColor={color.textMutedOnChalk}
+          style={styles.input}
+          multiline
+        />
+        <Pressable onPress={send} accessibilityRole="button" accessibilityLabel="Send" style={styles.send}>
+          <Text style={styles.sendLabel}>SEND</Text>
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: color.chalk },
+  gone: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.chalk },
+  headerAction: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.6, color: color.ink },
+  expiryNote: { ...type.caption, color: color.textMutedOnChalk, marginBottom: space(3), textAlign: 'center' },
+  bubble: {
+    maxWidth: '82%',
+    borderRadius: radius.card,
+    paddingVertical: space(2.5),
+    paddingHorizontal: space(3.5),
+    gap: 2,
+  },
+  bubbleMine: { alignSelf: 'flex-end', backgroundColor: color.ink },
+  bubbleTheirs: {
+    alignSelf: 'flex-start',
+    backgroundColor: color.chalkRaised,
+    borderWidth: 1,
+    borderColor: color.hairline,
+  },
+  msgMine: { ...type.body, color: color.textOnInk },
+  msgTheirs: { ...type.body, color: color.textOnChalk },
+  stamp: { ...type.monoSmall, fontSize: 9, color: color.textMutedOnChalk, alignSelf: 'flex-end' },
+  stampMine: { color: color.textMutedOnInk },
+  warning: {
+    marginHorizontal: space(4),
+    marginBottom: space(2),
+    backgroundColor: color.cautionTintBg,
+    borderRadius: radius.row,
+    borderWidth: 1,
+    borderColor: color.caution,
+    padding: space(3),
+  },
+  warningText: { ...type.caption, color: color.caution },
+  composer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: space(2.5),
+    paddingHorizontal: space(4),
+    paddingTop: space(2),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.hairline,
+    backgroundColor: color.chalk,
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    borderRadius: radius.row,
+    backgroundColor: color.chalkRaised,
+    paddingHorizontal: space(3.5),
+    paddingVertical: space(2.5),
+    maxHeight: 120,
+    ...type.body,
+    color: color.textOnChalk,
+  },
+  send: {
+    backgroundColor: color.amber,
+    borderRadius: radius.row,
+    paddingVertical: space(3),
+    paddingHorizontal: space(3.5),
+  },
+  sendLabel: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.8, color: color.ink },
+});
