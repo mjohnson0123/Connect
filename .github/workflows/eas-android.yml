@@ -7,15 +7,26 @@ name: Build Android APK (EAS)
 on:
   workflow_dispatch:
 
+env:
+  EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Check EXPO_TOKEN is configured
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::EXPO_TOKEN secret is missing. Add it at Settings → Secrets and variables → Actions → 'New repository secret' (the Secrets tab, not Variables). Name must be exactly EXPO_TOKEN; value comes from https://expo.dev/settings/access-tokens"
+            exit 1
+          fi
+          echo "EXPO_TOKEN is set."
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Set up EAS CLI
         uses: expo/expo-github-action@v8
