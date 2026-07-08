@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
@@ -16,11 +16,14 @@ import { color, radius, space, type } from '../../src/theme/tokens';
  */
 export default function Meetup() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const connections = useStore((s) => s.connections);
   const users = useStore((s) => s.users);
   const pins = useStore((s) => s.pins);
   const createPin = useStore((s) => s.createPin);
   const confirmPin = useStore((s) => s.confirmPin);
+  const meetupFeedback = useStore((s) => s.meetupFeedback);
+  const submitMeetupFeedback = useStore((s) => s.submitMeetupFeedback);
 
   const [mode, setMode] = useState<'choose' | 'show' | 'enter'>('choose');
   const [entered, setEntered] = useState('');
@@ -47,13 +50,47 @@ export default function Meetup() {
     if (r !== 'verified') setEntered('');
   };
 
+  const myFeedback = meetupFeedback.find((f) => f.connectionId === id && f.byUserId === MY_ID);
+
   const verifiedView = (
-    <View style={styles.verifiedBox}>
-      <Text style={styles.verifiedTitle}>✓ MEETUP VERIFIED</Text>
-      <Text style={styles.body}>
-        Codes matched — you’re each meeting the person from the app. Enjoy the
-        conversation.
-      </Text>
+    <View style={{ gap: space(4) }}>
+      <View style={styles.verifiedBox}>
+        <Text style={styles.verifiedTitle}>✓ MEETUP VERIFIED</Text>
+        <Text style={styles.body}>
+          Codes matched — you’re each meeting the person from the app. Enjoy the
+          conversation.
+        </Text>
+      </View>
+      {/* One-tap pulse: feeds the trust system and the operator view. */}
+      {myFeedback ? (
+        <Text style={styles.pulseThanks}>
+          {myFeedback.rating === 'good'
+            ? 'Thanks — glad it went well.'
+            : 'Thanks — your report is in the review queue.'}
+        </Text>
+      ) : (
+        <View style={{ gap: space(2.5) }}>
+          <Text style={styles.label}>HOW WAS IT?</Text>
+          <View style={{ flexDirection: 'row', gap: space(2.5) }}>
+            <Button
+              label="👍 Went well"
+              variant="quiet"
+              onPress={() => other && submitMeetupFeedback(conn!.id, other.id, 'good')}
+              style={{ flex: 1 }}
+            />
+            <Button
+              label="Report an issue"
+              variant="destructive"
+              onPress={() => {
+                if (!other) return;
+                submitMeetupFeedback(conn!.id, other.id, 'issue');
+                router.push({ pathname: '/report', params: { reportedId: other.id } });
+              }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      )}
     </View>
   );
 
@@ -133,6 +170,8 @@ export default function Meetup() {
 
 const styles = StyleSheet.create({
   lede: { ...type.body, color: color.textOnChalk },
+  label: { ...type.monoSmall, color: color.textMutedOnChalk },
+  pulseThanks: { ...type.caption, color: color.signal, textAlign: 'center' },
   body: { ...type.body, color: color.textMutedOnChalk, textAlign: 'center' },
   countdown: { ...type.mono, color: color.amberTextOnChalk },
   error: { ...type.caption, color: color.caution },

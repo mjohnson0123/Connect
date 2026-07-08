@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChatMessage } from '../../src/domain/types';
+import { ChatMessage, ReasonTag } from '../../src/domain/types';
 import { LIMITS } from '../../src/domain/vocab';
 import { formatClock } from '../../src/lib/time';
 import { MY_ID, useStore } from '../../src/store/useStore';
@@ -23,6 +23,30 @@ import { color, font, radius, space, type } from '../../src/theme/tokens';
  * explain themselves to the sender; the thread auto-expires 30 days after the
  * last message. Block / report / meetup PIN live in the header.
  */
+
+/** Blank-first-message killers, keyed to why the match happened. Tap fills the draft. */
+const OPENERS: Record<ReasonTag, string[]> = {
+  mentorship_receive: [
+    'What’s one thing you wish you’d known at my stage?',
+    'How did you decide your next move at each step?',
+  ],
+  mentorship_give: [
+    'Happy to share what I’ve learned — what are you working toward right now?',
+    'What’s the biggest question on your plate this year?',
+  ],
+  industry_peer: [
+    'What’s keeping your team busy this quarter?',
+    'How’s your side of the industry seeing things lately?',
+  ],
+  career_conversation: [
+    'What did your path into your current role look like?',
+    'What’s a career decision you’d make differently?',
+  ],
+  expanding_network: [
+    'What’s the most interesting thing you’re working on right now?',
+    'What does a typical week look like for you?',
+  ],
+};
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -30,6 +54,7 @@ export default function Chat() {
   const users = useStore((s) => s.users);
   const connections = useStore((s) => s.connections);
   const messages = useStore((s) => s.messages);
+  const requests = useStore((s) => s.requests);
   const sendMessage = useStore((s) => s.sendMessage);
   const blockUser = useStore((s) => s.blockUser);
 
@@ -40,6 +65,18 @@ export default function Chat() {
   const conn = connections.find((c) => c.id === id);
   const other = conn ? users.find((u) => u.id === (conn.userA === MY_ID ? conn.userB : conn.userA)) : null;
   const thread = messages.filter((m) => m.connectionId === id);
+
+  // The reason tag from the request that created this match drives the openers.
+  const matchReason =
+    (conn &&
+      requests.find(
+        (r) =>
+          r.status === 'accepted' &&
+          [r.fromUserId, r.toUserId].includes(conn.userA) &&
+          [r.fromUserId, r.toUserId].includes(conn.userB),
+      )?.reasonTag) ||
+    'expanding_network';
+  const openers = [...OPENERS[matchReason], OPENERS.expanding_network[0]].slice(0, 3);
 
   if (!conn || !other) {
     return (
@@ -133,6 +170,17 @@ export default function Chat() {
         }}
       />
 
+      {thread.length === 0 && !draft ? (
+        <View style={styles.openers}>
+          <Text style={styles.openersLabel}>BREAK THE ICE</Text>
+          {openers.map((o) => (
+            <Pressable key={o} onPress={() => setDraft(o)} style={styles.openerChip} accessibilityRole="button">
+              <Text style={styles.openerText}>{o}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {warning ? (
         <View style={styles.warning}>
           <Text style={styles.warningText}>{warning}</Text>
@@ -179,6 +227,21 @@ const styles = StyleSheet.create({
   msgTheirs: { ...type.body, color: color.textOnChalk },
   stamp: { ...type.monoSmall, fontSize: 9, color: color.textMutedOnChalk, alignSelf: 'flex-end' },
   stampMine: { color: color.textMutedOnInk },
+  openers: {
+    paddingHorizontal: space(4),
+    paddingBottom: space(2),
+    gap: space(2),
+  },
+  openersLabel: { ...type.monoSmall, color: color.textMutedOnChalk },
+  openerChip: {
+    borderWidth: 1,
+    borderColor: color.hairline,
+    backgroundColor: color.chalkRaised,
+    borderRadius: radius.row,
+    paddingVertical: space(2.5),
+    paddingHorizontal: space(3.5),
+  },
+  openerText: { ...type.caption, color: color.textOnChalk },
   warning: {
     marginHorizontal: space(4),
     marginBottom: space(2),

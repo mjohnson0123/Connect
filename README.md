@@ -36,7 +36,25 @@ DC" → check in → open the route → request/accept → chat → meetup PIN.
 | In-app messaging + content filter | `app/chat/[id].tsx`, `src/lib/contentFilter.ts` | Blocks phone/email/handles/links/solicitation before send; 3 blocked attempts escalate to the review queue; threads expire 30 days after last activity (§5.5) |
 | Meetup PIN verification | `app/meetup/[id].tsx`, `src/lib/pin.ts` | 6-digit, CSPRNG (rejection-sampled, never ID-derived), single-use, 15-min expiry (§5.6, §7) |
 | Block / Report / strikes | `app/report.tsx`, `app/safety.tsx`, store | Block is instant + silent + mutual invisibility; reports carry 24h/72h SLA; strikes: warn → suspend → ban (§5.7) |
-| Operator density + review queue | `app/density.tsx` | Density by mode/route and the human review step (§5.3, §13 Q2) — demo surface; production puts this behind admin auth with an audit trail |
+| Operator density + review queue | `app/density.tsx` | Density by mode/route, the human review step, and meetup-pulse feedback (§5.3, §13 Q2) — demo surface; production puts this behind admin auth with an audit trail |
+
+## v1 additions beyond the original PRD scope
+
+- **Canonical route catalog** (`src/domain/routes.ts`) — matching runs on stable route
+  keys (`train:marc-penn:towards-dc`), not free text. The catalog is a plain data file:
+  adding a metro area is appending entries; production serves the same shape from the
+  backend. Custom routes still work via normalized-text keys.
+- **Check-in window reminders** (`src/lib/reminders.ts`) — weekly LOCAL notifications
+  scheduled on-device from the declared window (15 min lead). No server, no location,
+  no data leaves the phone; permission asked contextually at the toggle.
+- **Route membership counts** — the board distinguishes "nobody checked in *yet*"
+  (N people ride this route) from a truly new route, so early routes read as early,
+  not dead.
+- **Meetup pulse** — after a PIN verifies: one-tap 👍 / report-an-issue; feeds the
+  review queue and the operator view's ground-truth "did real meetings happen" metric.
+- **Reason-aware conversation openers** — empty threads offer 3 tappable starters
+  derived from the match's reason tag; tap fills the draft, never auto-sends.
+- **Request expiry** — pending connection requests expire after 7 days.
 
 ## Design system (PRD §10)
 

@@ -1,11 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { routeKeyFor } from '../domain/routes';
 import {
   Block,
   ChatMessage,
   Connection,
   ConnectionRequest,
+  MeetupFeedback,
   MeetupVerification,
   ReasonTag,
   Report,
@@ -53,6 +55,9 @@ interface AppState {
   pins: MeetupVerification[];
   blocks: Block[];
   reports: Report[];
+  meetupFeedback: MeetupFeedback[];
+  /** patternId → scheduled local-notification ids (empty array = toggled on, web no-op). */
+  reminders: Record<string, string[]>;
   /** Client-side count of blocked message attempts, for review-queue escalation. */
   filterViolations: number;
   seededAt: number;
@@ -81,6 +86,9 @@ interface AppState {
 
   createPin: (connectionId: string) => MeetupVerification;
   confirmPin: (connectionId: string, entered: string) => 'verified' | 'expired' | 'mismatch';
+
+  setReminder: (patternId: string, notificationIds: string[] | null) => void;
+  submitMeetupFeedback: (connectionId: string, aboutUserId: string, rating: 'good' | 'issue') => void;
 
   blockUser: (blockedId: string) => void;
   unblockUser: (blockedId: string) => void;
@@ -113,6 +121,8 @@ export const useStore = create<AppState>()(
       pins: [],
       blocks: [],
       reports: [],
+      meetupFeedback: [],
+      reminders: {},
       filterViolations: 0,
       seededAt: 0,
 
@@ -177,6 +187,13 @@ export const useStore = create<AppState>()(
           ),
           messages: s.messages.filter((m) => !expiredConnIds.has(m.connectionId)),
           pins: s.pins.filter((p) => p.expiresAt > now && !p.used),
+          // Pending requests expire after 7 days: inboxes don't rot, and the
+          // sender's daily budget isn't held hostage by silence.
+          requests: s.requests.map((r) =>
+            r.status === 'pending' && now - r.createdAt > 7 * DAY
+              ? { ...r, status: 'expired' as const }
+              : r,
+          ),
         });
       },
 
@@ -268,9 +285,32 @@ export const useStore = create<AppState>()(
       },
 
       removePattern: (id) => {
+        const { [id]: _removed, ...reminders } = get().reminders;
         set({
           patterns: get().patterns.filter((p) => p.id !== id),
           checkIns: get().checkIns.filter((c) => c.tripPatternId !== id),
+          reminders,
+        });
+      },
+
+      setReminder: (patternId, notificationIds) => {
+        const current = get().reminders;
+        if (notificationIds === null) {
+          const { [patternId]: _off, ...rest } = current;
+          set({ reminders: rest });
+        } else {
+          set({ reminders: { ...current, [patternId]: notificationIds } });
+        }
+      },
+
+      submitMeetupFeedback: (connectionId, aboutUserId, rating) => {
+        const s = get();
+        if (s.meetupFeedback.some((f) => f.connectionId === connectionId && f.byUserId === ME_ID)) return;
+        set({
+          meetupFeedback: [
+            ...s.meetupFeedback,
+            { id: newId(), connectionId, byUserId: ME_ID, aboutUserId, rating, createdAt: Date.now() },
+          ],
         });
       },
 
@@ -477,13 +517,18 @@ export const useStore = create<AppState>()(
 
 export const MY_ID = ME_ID;
 
-/** Discovery matching (PRD §5.3): same mode + route + direction, both actively checked in. */
+/**
+ * The canonical matching key for a pattern (PRD §5.3). Catalog routes match
+ * by stable id; custom routes by normalized text. Direction is part of the
+ * key — morning and evening crowds are different rooms. This is the exact
+ * key a backend would index check-ins under.
+ */
+export function patternKey(p: TripPattern): string {
+  return routeKeyFor(p.mode, p.routeId, p.routeOrLine, p.direction);
+}
+
 export function patternsMatch(a: TripPattern, b: TripPattern): boolean {
-  return (
-    a.mode === b.mode &&
-    a.routeOrLine.trim().toLowerCase() === b.routeOrLine.trim().toLowerCase() &&
-    a.direction.trim().toLowerCase() === b.direction.trim().toLowerCase()
-  );
+  return patternKey(a) === patternKey(b);
 }
 
 export function isBlockedEitherWay(blocks: Block[], a: string, b: string): boolean {

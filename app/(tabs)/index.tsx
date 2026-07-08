@@ -6,7 +6,7 @@ import Screen from '../../src/components/Screen';
 import { Button } from '../../src/components/ui';
 import { modeCode } from '../../src/domain/vocab';
 import { formatRemaining } from '../../src/lib/time';
-import { isBlockedEitherWay, MY_ID, patternsMatch, useStore } from '../../src/store/useStore';
+import { isBlockedEitherWay, MY_ID, patternKey, patternsMatch, useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
 /**
@@ -36,7 +36,15 @@ export default function Board() {
       return !!u && u.standing !== 'banned' && u.standing !== 'suspended';
     });
     const mine = myActive.find((c) => c.tripPatternId === p.id);
-    return { pattern: p, count: overlapping.length, checkedIn: !!mine, until: mine?.activeUntil };
+    // Route membership: everyone with a declared pattern on this key, checked
+    // in or not. Keeps early routes reading as "early", not "dead".
+    const members = new Set(
+      patterns
+        .filter((tp) => tp.userId !== MY_ID && patternKey(tp) === patternKey(p))
+        .filter((tp) => !isBlockedEitherWay(blocks, MY_ID, tp.userId))
+        .map((tp) => tp.userId),
+    ).size;
+    return { pattern: p, count: overlapping.length, members, checkedIn: !!mine, until: mine?.activeUntil };
   });
 
   return (
@@ -56,7 +64,7 @@ export default function Board() {
         </View>
       ) : (
         <View style={{ gap: space(2.5) }}>
-          {rows.map(({ pattern, count, checkedIn, until }) => (
+          {rows.map(({ pattern, count, members, checkedIn, until }) => (
             <BoardRow
               key={pattern.id}
               left={modeCode(pattern.mode)}
@@ -67,7 +75,9 @@ export default function Board() {
                   ? `You’re checked in · ${formatRemaining(until!, now)} left · ${count} ${count === 1 ? 'person' : 'people'} here now`
                   : count > 0
                     ? `${count} ${count === 1 ? 'person who shares' : 'people who share'} this ${pattern.mode === 'place' ? 'spot' : 'commute'} checked in now`
-                    : 'Nobody checked in right now'
+                    : members > 0
+                      ? `${members} ${members === 1 ? 'person rides' : 'people ride'} this route · nobody’s checked in yet — be the flip`
+                      : 'You’re first on this route — it grows from here'
               }
               live={checkedIn}
               onPress={() => router.push({ pathname: '/pattern/[id]', params: { id: pattern.id } })}

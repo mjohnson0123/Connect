@@ -6,6 +6,12 @@ import Screen from '../../src/components/Screen';
 import SplitFlap from '../../src/components/SplitFlap';
 import { Button } from '../../src/components/ui';
 import { modeCode } from '../../src/domain/vocab';
+import {
+  cancelReminders,
+  ensurePermission,
+  remindersSupported,
+  schedulePatternReminders,
+} from '../../src/lib/reminders';
 import { formatDays, formatRemaining } from '../../src/lib/time';
 import { MY_ID, useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
@@ -22,7 +28,34 @@ export default function Trips() {
   const checkIn = useStore((s) => s.checkIn);
   const endCheckIn = useStore((s) => s.endCheckIn);
   const removePattern = useStore((s) => s.removePattern);
+  const reminders = useStore((s) => s.reminders);
+  const setReminder = useStore((s) => s.setReminder);
   const [justCheckedIn, setJustCheckedIn] = useState<string | null>(null);
+
+  const toggleReminder = async (patternId: string) => {
+    const pattern = patterns.find((p) => p.id === patternId);
+    if (!pattern) return;
+    if (!remindersSupported()) {
+      Alert.alert('Not available here', 'Reminders work in the installed app, not the web preview.');
+      return;
+    }
+    const existing = reminders[patternId];
+    if (existing) {
+      await cancelReminders(existing);
+      setReminder(patternId, null);
+      return;
+    }
+    // Contextual permission ask (PRD §9.3): only at the moment of the toggle.
+    const ok = await ensurePermission();
+    if (!ok) {
+      Alert.alert('Notifications are off', 'Allow notifications for Commuter Connect in system settings to get window reminders.');
+      return;
+    }
+    // Scheduled on-device from the window the user declared — no server, no
+    // location. The phone reminds itself.
+    const ids = await schedulePatternReminders(pattern);
+    setReminder(patternId, ids);
+  };
 
   const now = Date.now();
   const myPatterns = patterns.filter((p) => p.userId === MY_ID);
@@ -87,6 +120,11 @@ export default function Trips() {
                           setJustCheckedIn(p.id);
                         }}
                         style={{ flexGrow: 1 }}
+                      />
+                      <Button
+                        label={reminders[p.id] ? '🔔 Reminding' : 'Remind me'}
+                        variant="quiet"
+                        onPress={() => toggleReminder(p.id)}
                       />
                       <Button label="Remove" variant="quiet" onPress={() => confirmRemove(p.id, p.routeOrLine)} />
                     </>

@@ -18,6 +18,7 @@ export default function Density() {
   const users = useStore((s) => s.users);
   const reports = useStore((s) => s.reports);
   const resolveReport = useStore((s) => s.resolveReport);
+  const meetupFeedback = useStore((s) => s.meetupFeedback);
 
   const now = Date.now();
   const active = checkIns.filter((c) => c.activeUntil > now);
@@ -60,6 +61,32 @@ export default function Density() {
               </Text>
             </View>
           ))}
+        </View>
+
+        <Hairline />
+
+        <View style={{ gap: space(2.5) }}>
+          <Text style={styles.heading}>Meetup pulse</Text>
+          <Text style={styles.sub}>
+            One-tap feedback after PIN-verified meetups — the ground truth for “did a
+            real meeting happen and go well” (success metric §12).
+          </Text>
+          {meetupFeedback.length === 0 ? (
+            <Text style={styles.sub}>No verified meetups with feedback yet.</Text>
+          ) : (
+            meetupFeedback.map((f) => {
+              const about = users.find((u) => u.id === f.aboutUserId);
+              return (
+                <View key={f.id} style={styles.row}>
+                  <Text style={styles.mono}>{f.rating === 'good' ? '👍 GOOD' : '⚠ ISSUE'}</Text>
+                  <Text style={styles.route} numberOfLines={1}>
+                    about {about?.displayName ?? f.aboutUserId}
+                  </Text>
+                  <Text style={styles.mono}>{new Date(f.createdAt).toLocaleDateString()}</Text>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <Hairline />

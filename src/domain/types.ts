@@ -34,6 +34,8 @@ export interface TripPattern {
   id: string;
   userId: string;
   mode: TravelMode;
+  /** Canonical catalog route id when picked from the catalog; undefined for custom routes. */
+  routeId?: string;
   routeOrLine: string;
   direction: string;
   daysOfWeek: number[]; // 0 = Sunday
@@ -52,7 +54,7 @@ export interface TripCheckIn {
   activeUntil: number; // epoch ms; auto-expires ≤ 3 hours
 }
 
-export type RequestStatus = 'pending' | 'accepted' | 'declined';
+export type RequestStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 
 export interface ConnectionRequest {
   id: string;
@@ -93,6 +95,16 @@ export interface MeetupVerification {
 export interface Block {
   blockerId: string;
   blockedId: string;
+  createdAt: number;
+}
+
+/** One-tap pulse after a PIN-verified meetup (feeds trust signals + operator view). */
+export interface MeetupFeedback {
+  id: string;
+  connectionId: string;
+  byUserId: string;
+  aboutUserId: string;
+  rating: 'good' | 'issue';
   createdAt: number;
 }
 
