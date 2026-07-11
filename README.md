@@ -5,8 +5,35 @@ or terminal on a recurring basis. *"You've probably sat three rows from your nex
 mentor. Let's fix that."*
 
 Cross-platform native app built with **Expo (React Native) + TypeScript + expo-router**,
-per the PRD's platform recommendation (§8). One codebase for iOS and Android; the web
-export exists only as a development preview.
+per the PRD's platform recommendation (§8), backed by a **live Supabase backend**
+(Postgres + RLS + Auth + Realtime). One codebase for iOS and Android; the web export
+exists only as a development preview.
+
+## Backend (Supabase project `voqberiubbodifcctahi`, us-east-1)
+
+- **Schema**: every PRD §4 entity as a table with row-level security; default-deny,
+  narrow read policies (you see yourself, your connections, and pending-request
+  counterparties — discovery goes through RPCs).
+- **Business rules live server-side** as SECURITY DEFINER functions — the client is
+  never the security boundary: `check_in` (3h cap, standing check), `board_summary`
+  (aggregate counts before identities), `route_people` (shared-route + active-check-in
+  only), `send_request` (reason tag, 10/day, intro content filter, double opt-in),
+  `respond_request`, `send_message` (server content filter + escalation to review
+  queue + 30-day thread expiry), `create_pin`/`confirm_pin` (CSPRNG, single-use,
+  15 min, generator can't self-confirm), `block_user` (mutual invisibility),
+  `file_report` (24h/72h SLA), `resolve_report` (operator-only strikes),
+  `operator_overview`, `delete_account` (cascading, in-app), `retention_sweep`.
+- **Realtime** on messages/requests/connections for live chat.
+- **Verified** by a SQL end-to-end suite run against the live database (signup →
+  discovery → double opt-in → filtered chat → PIN → block → moderation → deletion).
+- **Pilot demo scaffolding** (remove before launch): five demo riders on the Penn
+  Line and a `demo_bootstrap()` RPC that refreshes their check-ins and sends new
+  users one inbound request.
+- Client env in `.env` (`EXPO_PUBLIC_SUPABASE_URL`, publishable key — safe to commit;
+  RLS governs all access).
+
+**Dashboard settings to check**: Authentication → Sign In / Up → Email → disable
+"Confirm email" for the pilot (or keep it and users confirm via the emailed link).
 
 ## Run it
 

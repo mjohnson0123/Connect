@@ -6,51 +6,71 @@ import SplitFlap from '../../src/components/SplitFlap';
 import { Button, Field } from '../../src/components/ui';
 import { LIMITS } from '../../src/domain/vocab';
 import { formatRemaining } from '../../src/lib/time';
-import { MY_ID, useStore } from '../../src/store/useStore';
+import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * Meetup PIN verification (PRD §5.6) — the rideshare-pickup pattern. One side
- * shows a 6-digit single-use code (split-flap moment #3), the other types it
- * in; a match confirms you're each meeting the person from the app.
+ * Meetup PIN verification (PRD §5.6). Codes are generated server-side
+ * (CSPRNG), single-use, 15-minute expiry; the generator can't self-confirm.
+ * Split-flap moment #3 fires on the PIN reveal.
  */
 export default function Meetup() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, name, otherId } = useLocalSearchParams<{ id: string; name?: string; otherId?: string }>();
   const router = useRouter();
-  const connections = useStore((s) => s.connections);
-  const users = useStore((s) => s.users);
-  const pins = useStore((s) => s.pins);
   const createPin = useStore((s) => s.createPin);
   const confirmPin = useStore((s) => s.confirmPin);
-  const meetupFeedback = useStore((s) => s.meetupFeedback);
+  const pinVerified = useStore((s) => s.pinVerified);
   const submitMeetupFeedback = useStore((s) => s.submitMeetupFeedback);
 
   const [mode, setMode] = useState<'choose' | 'show' | 'enter'>('choose');
+  const [shown, setShown] = useState<{ pin: string; expiresAt: number } | null>(null);
   const [entered, setEntered] = useState('');
   const [result, setResult] = useState<'verified' | 'expired' | 'mismatch' | null>(null);
+  const [alreadyVerified, setAlreadyVerified] = useState(false);
+  const [feedbackGiven, setFeedbackGiven] = useState<'good' | 'issue' | null>(null);
+  const [busy, setBusy] = useState(false);
   const [, forceTick] = useState(0);
 
-  const conn = connections.find((c) => c.id === id);
-  const other = conn ? users.find((u) => u.id === (conn.userA === MY_ID ? conn.userB : conn.userA)) : null;
-  const activePin = pins.find((p) => p.connectionId === id && !p.used && p.expiresAt > Date.now());
-  const verifiedPin = pins.find((p) => p.connectionId === id && p.verifiedAt);
+  const otherName = name ?? 'your connection';
 
-  // Tick the countdown while a PIN is showing.
+  useEffect(() => {
+    if (id) void pinVerified(id).then(setAlreadyVerified);
+  }, [id, pinVerified]);
+
   useEffect(() => {
     if (mode !== 'show') return;
     const t = setInterval(() => forceTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [mode]);
 
-  if (!conn || !other) return null;
+  if (!id) return null;
+  const verified = alreadyVerified || result === 'verified';
 
-  const submitEntered = () => {
-    const r = confirmPin(conn.id, entered);
+  const showCode = async () => {
+    setBusy(true);
+    const pin = await createPin(id);
+    setBusy(false);
+    if (pin) {
+      setShown(pin);
+      setMode('show');
+    }
+  };
+
+  const submitEntered = async () => {
+    setBusy(true);
+    const r = await confirmPin(id, entered);
+    setBusy(false);
     setResult(r);
     if (r !== 'verified') setEntered('');
   };
 
-  const myFeedback = meetupFeedback.find((f) => f.connectionId === id && f.byUserId === MY_ID);
+  const giveFeedback = async (rating: 'good' | 'issue') => {
+    await submitMeetupFeedback(id, rating);
+    setFeedbackGiven(rating);
+    if (rating === 'issue' && otherId) {
+      router.push({ pathname: '/report', params: { reportedId: otherId, name: otherName } });
+    }
+  };
 
   const verifiedView = (
     <View style={{ gap: space(4) }}>
@@ -61,33 +81,16 @@ export default function Meetup() {
           conversation.
         </Text>
       </View>
-      {/* One-tap pulse: feeds the trust system and the operator view. */}
-      {myFeedback ? (
+      {feedbackGiven ? (
         <Text style={styles.pulseThanks}>
-          {myFeedback.rating === 'good'
-            ? 'Thanks — glad it went well.'
-            : 'Thanks — your report is in the review queue.'}
+          {feedbackGiven === 'good' ? 'Thanks — glad it went well.' : 'Thanks — your report is in the review queue.'}
         </Text>
       ) : (
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.label}>HOW WAS IT?</Text>
           <View style={{ flexDirection: 'row', gap: space(2.5) }}>
-            <Button
-              label="👍 Went well"
-              variant="quiet"
-              onPress={() => other && submitMeetupFeedback(conn!.id, other.id, 'good')}
-              style={{ flex: 1 }}
-            />
-            <Button
-              label="Report an issue"
-              variant="destructive"
-              onPress={() => {
-                if (!other) return;
-                submitMeetupFeedback(conn!.id, other.id, 'issue');
-                router.push({ pathname: '/report', params: { reportedId: other.id } });
-              }}
-              style={{ flex: 1 }}
-            />
+            <Button label="👍 Went well" variant="quiet" onPress={() => void giveFeedback('good')} style={{ flex: 1 }} />
+            <Button label="Report an issue" variant="destructive" onPress={() => void giveFeedback('issue')} style={{ flex: 1 }} />
           </View>
         </View>
       )}
@@ -98,40 +101,35 @@ export default function Meetup() {
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
         <Text style={styles.lede}>
-          Meeting {other.displayName} in person? Verify each other first: one of you
-          shows a code, the other types it in. Codes are single-use, random, and expire
-          in {LIMITS.pinMinutes} minutes.
+          Meeting {otherName} in person? Verify each other first: one of you shows a
+          code, the other types it in. Codes are single-use, random, and expire in{' '}
+          {LIMITS.pinMinutes} minutes.
         </Text>
 
-        {verifiedPin || result === 'verified' ? (
+        {verified ? (
           verifiedView
         ) : mode === 'choose' ? (
           <View style={{ gap: space(3) }}>
-            <Button
-              label="Show a code"
-              onPress={() => {
-                if (!activePin) createPin(conn.id);
-                setMode('show');
-              }}
-            />
+            <Button label={busy ? 'Generating…' : 'Show a code'} onPress={() => void showCode()} disabled={busy} />
             <Button label="Enter their code" variant="ink" onPress={() => setMode('enter')} />
           </View>
         ) : mode === 'show' ? (
           <View style={{ gap: space(4), alignItems: 'center' }}>
-            {activePin ? (
+            {shown && shown.expiresAt > Date.now() ? (
               <>
-                <SplitFlap text={activePin.pin} cellSize={44} />
+                <SplitFlap text={shown.pin} cellSize={44} />
                 <Text style={styles.countdown}>
-                  EXPIRES IN {formatRemaining(activePin.expiresAt).toUpperCase()}
+                  EXPIRES IN {formatRemaining(shown.expiresAt).toUpperCase()}
                 </Text>
                 <Text style={styles.body}>
-                  Have {other.displayName} type this code on their screen. It works once.
+                  Have {otherName} type this code on their screen. It works once — and
+                  only they can confirm it, not you.
                 </Text>
               </>
             ) : (
               <>
                 <Text style={styles.body}>That code expired.</Text>
-                <Button label="Generate a new code" onPress={() => createPin(conn.id)} />
+                <Button label="Generate a new code" onPress={() => void showCode()} disabled={busy} />
               </>
             )}
             <Button label="Back" variant="quiet" onPress={() => setMode('choose')} />
@@ -154,7 +152,7 @@ export default function Meetup() {
                 No active code — ask them to generate a fresh one and try again.
               </Text>
             ) : null}
-            <Button label="Verify" onPress={submitEntered} disabled={entered.length !== 6} />
+            <Button label={busy ? 'Verifying…' : 'Verify'} onPress={() => void submitEntered()} disabled={entered.length !== 6 || busy} />
             <Button label="Back" variant="quiet" onPress={() => setMode('choose')} />
           </View>
         )}

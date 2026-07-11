@@ -9,29 +9,31 @@ import { useStore } from '../src/store/useStore';
 import { color, space, type } from '../src/theme/tokens';
 
 /**
- * Report flow (PRD §5.7): category is required; every report enters a human
- * review queue with an SLA — 24h for safety-flagged categories, 72h otherwise.
+ * Report flow (PRD §5.7): category required; the file_report RPC assigns the
+ * SLA (24h safety-flagged, 72h otherwise) and queues human review.
  */
 export default function Report() {
-  const { reportedId } = useLocalSearchParams<{ reportedId: string }>();
+  const { reportedId, name } = useLocalSearchParams<{ reportedId: string; name?: string }>();
   const router = useRouter();
-  const users = useStore((s) => s.users);
   const fileReport = useStore((s) => s.fileReport);
 
   const [category, setCategory] = useState<ReportCategory | null>(null);
   const [context, setContext] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const reported = users.find((u) => u.id === reportedId);
   if (!reportedId) return null;
+  const displayName = name ?? 'this person';
 
-  const submit = () => {
+  const submit = async () => {
     if (!category) {
       setError('Pick a category — it’s required.');
       return;
     }
-    fileReport(reportedId, category, context.trim());
+    setBusy(true);
+    await fileReport(reportedId, category, context.trim());
+    setBusy(false);
     setSent(true);
   };
 
@@ -48,8 +50,8 @@ export default function Report() {
             then a permanent ban.
           </Text>
           <Text style={styles.body}>
-            If you don’t want to hear from {reported?.displayName ?? 'this person'} at all,
-            blocking is instant and silent.
+            If you don’t want to hear from {displayName} at all, blocking is instant and
+            silent.
           </Text>
           <Button label="Done" onPress={() => router.back()} />
         </View>
@@ -60,12 +62,10 @@ export default function Report() {
   return (
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
-        {reported ? (
-          <Text style={styles.body}>
-            Reporting <Text style={styles.name}>{reported.displayName}</Text>. They won’t
-            know you filed this.
-          </Text>
-        ) : null}
+        <Text style={styles.body}>
+          Reporting <Text style={styles.name}>{displayName}</Text>. They won’t know you
+          filed this.
+        </Text>
 
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.label}>WHAT HAPPENED? (REQUIRED)</Text>
@@ -91,7 +91,7 @@ export default function Report() {
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button label="Submit report" variant="destructive" onPress={submit} />
+        <Button label={busy ? 'Submitting…' : 'Submit report'} variant="destructive" onPress={submit} disabled={busy} />
       </View>
     </Screen>
   );

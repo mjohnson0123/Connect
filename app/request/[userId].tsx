@@ -9,29 +9,30 @@ import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
 /**
- * Request compose (PRD §5.4): a reason tag is required, the intro is short
- * and optional, and the store enforces the 10/day rate limit. The recipient
- * must accept before any thread opens.
+ * Request compose (PRD §5.4). The send_request RPC enforces the reason tag,
+ * the 10/day rate limit, the intro content filter, and double opt-in.
  */
 export default function RequestCompose() {
-  const { userId } = useLocalSearchParams<{ userId: string }>();
+  const { userId, name } = useLocalSearchParams<{ userId: string; name?: string }>();
   const router = useRouter();
-  const users = useStore((s) => s.users);
   const sendRequest = useStore((s) => s.sendRequest);
 
   const [reason, setReason] = useState<ReasonTag | null>(null);
   const [intro, setIntro] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const to = users.find((u) => u.id === userId);
-  if (!to) return null;
+  if (!userId) return null;
+  const displayName = name ?? 'this person';
 
-  const submit = () => {
+  const submit = async () => {
     if (!reason) {
       setError('Pick a reason — it’s required.');
       return;
     }
-    const err = sendRequest(to.id, reason, intro.trim());
+    setBusy(true);
+    const err = await sendRequest(userId, reason, intro.trim());
+    setBusy(false);
     if (err) {
       setError(err);
       return;
@@ -43,7 +44,7 @@ export default function RequestCompose() {
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
         <Text style={styles.lede}>
-          To <Text style={styles.name}>{to.displayName}</Text> · they’ll see your profile,
+          To <Text style={styles.name}>{displayName}</Text> · they’ll see your profile,
           your reason, and your note. Nothing more happens unless they accept.
         </Text>
 
@@ -71,7 +72,7 @@ export default function RequestCompose() {
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button label="Send request" onPress={submit} />
+        <Button label={busy ? 'Sending…' : 'Send request'} onPress={submit} disabled={busy} />
         <Text style={styles.note}>
           Up to {LIMITS.requestsPerDay} requests a day. Pitches, selling, and recruiting
           cold-outreach aren’t allowed and are reportable.

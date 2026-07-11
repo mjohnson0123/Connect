@@ -13,28 +13,30 @@ import {
   schedulePatternReminders,
 } from '../../src/lib/reminders';
 import { formatDays, formatRemaining } from '../../src/lib/time';
-import { MY_ID, useStore } from '../../src/store/useStore';
+import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * Trip patterns + ephemeral check-in (PRD §5.3). A pattern alone reveals
- * nothing; only a check-in makes you discoverable, for at most 3 hours,
- * ended early anytime. Split-flap moment #1 fires when a check-in goes live.
+ * Trip patterns + ephemeral check-in (PRD §5.3). The 3-hour window and
+ * standing checks are enforced by the check_in RPC. Split-flap moment #1
+ * fires when a check-in goes live.
  */
 export default function Trips() {
   const router = useRouter();
-  const patterns = useStore((s) => s.patterns);
-  const checkIns = useStore((s) => s.checkIns);
+  const board = useStore((s) => s.board);
   const checkIn = useStore((s) => s.checkIn);
   const endCheckIn = useStore((s) => s.endCheckIn);
   const removePattern = useStore((s) => s.removePattern);
   const reminders = useStore((s) => s.reminders);
   const setReminder = useStore((s) => s.setReminder);
   const [justCheckedIn, setJustCheckedIn] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const now = Date.now();
 
   const toggleReminder = async (patternId: string) => {
-    const pattern = patterns.find((p) => p.id === patternId);
-    if (!pattern) return;
+    const entry = board.find((b) => b.pattern.id === patternId);
+    if (!entry) return;
     if (!remindersSupported()) {
       Alert.alert('Not available here', 'Reminders work in the installed app, not the web preview.');
       return;
@@ -45,28 +47,19 @@ export default function Trips() {
       setReminder(patternId, null);
       return;
     }
-    // Contextual permission ask (PRD §9.3): only at the moment of the toggle.
     const ok = await ensurePermission();
     if (!ok) {
       Alert.alert('Notifications are off', 'Allow notifications for Commuter Connect in system settings to get window reminders.');
       return;
     }
-    // Scheduled on-device from the window the user declared — no server, no
-    // location. The phone reminds itself.
-    const ids = await schedulePatternReminders(pattern);
+    const ids = await schedulePatternReminders(entry.pattern);
     setReminder(patternId, ids);
   };
-
-  const now = Date.now();
-  const myPatterns = patterns.filter((p) => p.userId === MY_ID);
-  const activeByPattern = new Map(
-    checkIns.filter((c) => c.userId === MY_ID && c.activeUntil > now).map((c) => [c.tripPatternId, c]),
-  );
 
   const confirmRemove = (id: string, label: string) => {
     Alert.alert('Remove trip pattern?', `“${label}” and any active check-in on it will be removed.`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => removePattern(id) },
+      { text: 'Remove', style: 'destructive', onPress: () => void removePattern(id) },
     ]);
   };
 
@@ -83,7 +76,7 @@ export default function Trips() {
       ) : null}
 
       <View style={{ gap: space(2.5), paddingTop: space(2) }}>
-        {myPatterns.length === 0 ? (
+        {board.length === 0 ? (
           <View style={{ gap: space(4), paddingTop: space(8) }}>
             <Text style={styles.emptyTitle}>Declare a recurring trip</Text>
             <Text style={styles.emptyBody}>
@@ -92,8 +85,8 @@ export default function Trips() {
             </Text>
           </View>
         ) : (
-          myPatterns.map((p) => {
-            const active = activeByPattern.get(p.id);
+          board.map(({ pattern: p, checkedInUntil }) => {
+            const active = !!checkedInUntil && checkedInUntil > now;
             return (
               <View key={p.id} style={styles.card}>
                 <BoardRow
@@ -101,30 +94,34 @@ export default function Trips() {
                   leftSub={`${p.windowStart}–${p.windowEnd}`}
                   title={p.routeOrLine}
                   subtitle={[p.direction, formatDays(p.daysOfWeek), p.stationOrCode].filter(Boolean).join(' · ')}
-                  live={!!active}
+                  live={active}
                 />
                 <View style={styles.cardActions}>
                   {active ? (
                     <>
                       <Text style={styles.window}>
-                        LIVE · {formatRemaining(active.activeUntil, now)} REMAINING
+                        LIVE · {formatRemaining(checkedInUntil, now)} REMAINING
                       </Text>
-                      <Button label="End check-in" variant="quiet" onPress={() => endCheckIn(active.id)} />
+                      <Button label="End check-in" variant="quiet" onPress={() => void endCheckIn(p.id)} />
                     </>
                   ) : (
                     <>
                       <Button
-                        label="I’m traveling now"
+                        label={busyId === p.id ? 'Checking in…' : 'I’m traveling now'}
+                        disabled={busyId === p.id}
                         onPress={() => {
-                          checkIn(p.id);
-                          setJustCheckedIn(p.id);
+                          setBusyId(p.id);
+                          void checkIn(p.id).then(() => {
+                            setBusyId(null);
+                            setJustCheckedIn(p.id);
+                          });
                         }}
                         style={{ flexGrow: 1 }}
                       />
                       <Button
                         label={reminders[p.id] ? '🔔 Reminding' : 'Remind me'}
                         variant="quiet"
-                        onPress={() => toggleReminder(p.id)}
+                        onPress={() => void toggleReminder(p.id)}
                       />
                       <Button label="Remove" variant="quiet" onPress={() => confirmRemove(p.id, p.routeOrLine)} />
                     </>

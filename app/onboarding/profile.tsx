@@ -24,13 +24,14 @@ export default function ProfileSetup() {
   const [industry, setIndustry] = useState((me?.industryTags ?? []).join(', '));
   const [reasons, setReasons] = useState<ReasonTag[]>(me?.reasonTags ?? []);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const editing = !!me?.displayName;
 
   const toggleReason = (tag: ReasonTag) =>
     setReasons((r) => (r.includes(tag) ? r.filter((t) => t !== tag) : [...r, tag]));
 
-  const submit = () => {
+  const submit = async () => {
     if (!displayName.trim() || !headline.trim()) {
       setError('Display name and headline are required.');
       return;
@@ -45,9 +46,10 @@ export default function ProfileSetup() {
       .map((w) => w[0]?.toUpperCase() ?? '')
       .slice(0, 2)
       .join('');
-    saveProfile({
+    setBusy(true);
+    const err = await saveProfile({
       displayName: displayName.trim(),
-      photo: initials || '·',
+      monogram: initials || '·',
       headline: headline.trim(),
       bio: bio.trim(),
       industryTags: industry
@@ -57,6 +59,11 @@ export default function ProfileSetup() {
         .slice(0, 3),
       reasonTags: reasons,
     });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
     if (editing) router.back();
     else router.replace('/(tabs)');
   };
@@ -105,7 +112,7 @@ export default function ProfileSetup() {
           </Text>
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button label={editing ? 'Save changes' : 'Finish profile'} onPress={submit} />
+        <Button label={busy ? 'Saving…' : editing ? 'Save changes' : 'Finish profile'} onPress={submit} disabled={busy} />
       </View>
     </Screen>
   );

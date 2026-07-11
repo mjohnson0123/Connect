@@ -22,12 +22,14 @@ export default function Verify() {
 
   const finish = () => {
     setPhase('checking');
-    // Simulated liveness service round-trip. Production: capture → encrypted
-    // upload → liveness + face-match against profile photo → delete image.
+    // Simulated liveness service round-trip; the verified flag is set
+    // server-side (complete_verification RPC). Production: capture → encrypted
+    // upload → vendor liveness + face-match → delete image → webhook sets flag.
     setTimeout(() => {
-      completeVerification();
-      setPhase('done');
-      setTimeout(() => router.replace('/onboarding/profile'), 900);
+      void completeVerification().then(() => {
+        setPhase('done');
+        setTimeout(() => router.replace('/onboarding/profile'), 900);
+      });
     }, 1800);
   };
 

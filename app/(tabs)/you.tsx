@@ -10,7 +10,6 @@ import { color, space, type } from '../../src/theme/tokens';
 export default function You() {
   const router = useRouter();
   const me = useStore((s) => s.me);
-  const account = useStore((s) => s.account);
   const deleteAccount = useStore((s) => s.deleteAccount);
   const signOut = useStore((s) => s.signOut);
 
@@ -27,8 +26,7 @@ export default function You() {
           text: 'Delete account',
           style: 'destructive',
           onPress: () => {
-            deleteAccount();
-            router.replace('/onboarding/welcome');
+            void deleteAccount().then(() => router.replace('/onboarding/welcome'));
           },
         },
       ],
@@ -46,10 +44,6 @@ export default function You() {
               {me.verificationStatus === 'verified' ? <VerifiedBadge /> : null}
             </View>
             <Text style={styles.headline}>{me.headline}</Text>
-            <Text style={styles.mono}>
-              {account?.email}
-              {account?.provider === 'google' ? ' · GOOGLE' : ''}
-            </Text>
           </View>
         </View>
 
@@ -93,8 +87,7 @@ export default function You() {
             label="Sign out"
             variant="quiet"
             onPress={() => {
-              signOut();
-              router.replace('/onboarding/signin');
+              void signOut().then(() => router.replace('/onboarding/signin'));
             }}
           />
           <Button label="Delete account" variant="destructive" onPress={confirmDelete} />

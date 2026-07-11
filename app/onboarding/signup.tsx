@@ -2,29 +2,26 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
-import { Button, Field, Hairline } from '../../src/components/ui';
-import { hashPassword, signInWithGoogle } from '../../src/lib/auth';
+import { Button, Field } from '../../src/components/ui';
 import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
 /**
- * Account creation with a hard 18+ gate (PRD §5.1). Two paths, both local
- * while the database is disconnected: direct email/password, or Google via
- * the simulated provider seam (src/lib/auth.ts). The DOB gate applies to
- * both — OAuth doesn't skip it. Production adds Sign in with Apple next to
- * Google (Guideline 4.8: never ship a third-party login alone).
+ * Real account creation (Supabase Auth) with a hard 18+ gate (PRD §5.1).
+ * The DOB is checked on-device and never stored. Google + Sign in with Apple
+ * arrive together later (Guideline 4.8: never ship a third-party login alone).
  */
 export default function SignUp() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string; googleEmail?: string }>();
+  const params = useLocalSearchParams<{ email?: string }>();
   const signUp = useStore((s) => s.signUp);
 
-  const [googleEmail, setGoogleEmail] = useState<string | null>(params.googleEmail ?? null);
   const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
   const [dob, setDob] = useState(''); // MM/DD/YYYY
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState(false);
 
   const parseDob = (): Date | null => {
     const m = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -36,16 +33,13 @@ export default function SignUp() {
 
   const submit = async () => {
     setError(null);
-    const effectiveEmail = googleEmail ?? email.trim();
-    if (!googleEmail) {
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(effectiveEmail)) {
-        setError('Enter a valid email address.');
-        return;
-      }
-      if (password.length < 8) {
-        setError('Password needs at least 8 characters.');
-        return;
-      }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Enter a valid email address.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password needs at least 8 characters.');
+      return;
     }
     const date = parseDob();
     if (!date) {
@@ -53,12 +47,12 @@ export default function SignUp() {
       return;
     }
     setBusy(true);
-    const passwordHash = googleEmail ? null : await hashPassword(effectiveEmail, password);
+    const err = await signUp(email.trim(), password, date);
     setBusy(false);
-    const err = signUp(effectiveEmail, date, {
-      passwordHash,
-      provider: googleEmail ? 'google' : 'password',
-    });
+    if (err === 'CONFIRM_EMAIL') {
+      setConfirmEmail(true);
+      return;
+    }
     if (err) {
       setError(err);
       return;
@@ -66,50 +60,45 @@ export default function SignUp() {
     router.replace('/onboarding/verify');
   };
 
-  const startGoogle = async () => {
-    setError(null);
-    setBusy(true);
-    const profile = await signInWithGoogle();
-    setBusy(false);
-    setGoogleEmail(profile.email);
-  };
+  if (confirmEmail) {
+    return (
+      <Screen>
+        <View style={{ gap: space(4), paddingTop: space(8) }}>
+          <Text style={styles.title}>Check your email</Text>
+          <Text style={styles.lede}>
+            We sent a confirmation link to {email.trim()}. Tap it, then come back and
+            sign in.
+          </Text>
+          <Button label="Go to sign in" onPress={() => router.replace('/onboarding/signin')} />
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
         <Text style={styles.lede}>
-          Your date of birth is used once to confirm you’re 18 or older — it never
-          appears on your profile.
+          Your date of birth is used once to confirm you’re 18 or older — it’s never
+          stored and never appears on your profile.
         </Text>
-
-        {googleEmail ? (
-          <View style={styles.googleBox}>
-            <Text style={styles.googleLabel}>SIGNING UP WITH GOOGLE</Text>
-            <Text style={styles.googleEmail}>{googleEmail}</Text>
-            <Button label="Use a different method" variant="quiet" onPress={() => setGoogleEmail(null)} />
-          </View>
-        ) : (
-          <>
-            <Field
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              placeholder="you@example.com"
-            />
-            <Field
-              label="Password (8+ characters)"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="new-password"
-              placeholder="••••••••"
-            />
-          </>
-        )}
-
+        <Field
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          placeholder="you@example.com"
+        />
+        <Field
+          label="Password (8+ characters)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholder="••••••••"
+        />
         <Field
           label="Date of birth"
           value={dob}
@@ -118,24 +107,15 @@ export default function SignUp() {
           placeholder="MM/DD/YYYY"
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button label={busy ? 'One moment…' : 'Continue'} onPress={submit} disabled={busy} />
-
-        {!googleEmail ? (
-          <>
-            <Hairline />
-            <Button label="Continue with Google" variant="ink" onPress={startGoogle} disabled={busy} />
-            <Button
-              label="Already have an account? Sign in"
-              variant="quiet"
-              onPress={() => router.replace('/onboarding/signin')}
-            />
-          </>
-        ) : null}
-
+        <Button label={busy ? 'Creating account…' : 'Continue'} onPress={submit} disabled={busy} />
+        <Button
+          label="Already have an account? Sign in"
+          variant="quiet"
+          onPress={() => router.replace('/onboarding/signin')}
+        />
         <Text style={styles.note}>
-          Demo build: accounts live on this device only — no server, no database. Google
-          sign-in is simulated; production pairs it with Sign in with Apple (required
-          once any third-party login ships).
+          Accounts are live (Supabase). Google and Apple sign-in ship together in a
+          later build.
         </Text>
       </View>
     </Screen>
@@ -143,17 +123,8 @@ export default function SignUp() {
 }
 
 const styles = StyleSheet.create({
+  title: { ...type.title, color: color.textOnChalk },
   lede: { ...type.body, color: color.textMutedOnChalk },
   error: { ...type.caption, color: color.caution },
   note: { ...type.caption, fontSize: 11, color: color.textMutedOnChalk, textAlign: 'center' },
-  googleBox: {
-    backgroundColor: color.chalkRaised,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    borderRadius: 12,
-    padding: space(4),
-    gap: space(2.5),
-  },
-  googleLabel: { ...type.monoSmall, color: color.textMutedOnChalk },
-  googleEmail: { ...type.bodyMedium, color: color.textOnChalk },
 });

@@ -1,47 +1,65 @@
-import React from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../src/components/Screen';
-import { Button, Hairline } from '../src/components/ui';
-import { modeCode, REPORT_CATEGORIES } from '../src/domain/vocab';
+import { Hairline } from '../src/components/ui';
+import { supabase } from '../src/lib/supabase';
 import { useStore } from '../src/store/useStore';
 import { color, radius, space, type } from '../src/theme/tokens';
 
+type Overview = NonNullable<Awaited<ReturnType<ReturnType<typeof useStore.getState>['operatorOverview']>>>;
+
 /**
- * Operator view (PRD §5.3, §5.7, §13 Q2) — not shipped to end users at MVP.
- * Density by mode/route shows where matching is actually working; the review
- * queue is the human step that turns reports into strikes. In production this
- * is a separate, least-privilege admin surface with a full audit trail.
+ * Operator view (PRD §5.3, §5.7, §13 Q2). Data comes from operator_overview()
+ * which is restricted server-side to profiles with is_operator = true.
+ * Production moves this behind separate admin auth with an audit trail.
  */
 export default function Density() {
-  const patterns = useStore((s) => s.patterns);
-  const checkIns = useStore((s) => s.checkIns);
-  const users = useStore((s) => s.users);
-  const reports = useStore((s) => s.reports);
-  const resolveReport = useStore((s) => s.resolveReport);
-  const meetupFeedback = useStore((s) => s.meetupFeedback);
+  const operatorOverview = useStore((s) => s.operatorOverview);
+  const [data, setData] = useState<Overview | null>(null);
+  const [denied, setDenied] = useState(false);
 
-  const now = Date.now();
-  const active = checkIns.filter((c) => c.activeUntil > now);
+  const load = useCallback(async () => {
+    const res = await operatorOverview();
+    if (res === null) setDenied(true);
+    else {
+      setDenied(false);
+      setData(res);
+    }
+  }, [operatorOverview]);
 
-  const byRoute = new Map<string, { mode: string; route: string; members: number; live: number }>();
-  for (const p of patterns) {
-    const key = `${p.mode}|${p.routeOrLine.toLowerCase()}|${p.direction.toLowerCase()}`;
-    const entry = byRoute.get(key) ?? { mode: p.mode, route: `${p.routeOrLine} · ${p.direction}`, members: 0, live: 0 };
-    entry.members += 1;
-    entry.live += active.some((c) => c.tripPatternId === p.id) ? 1 : 0;
-    byRoute.set(key, entry);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  const resolve = async (reportId: string, confirmed: boolean) => {
+    await supabase.rpc('resolve_report', { p_report_id: reportId, p_confirmed: confirmed });
+    await load();
+  };
+
+  if (denied) {
+    return (
+      <Screen>
+        <View style={{ gap: space(3), paddingTop: space(8) }}>
+          <Text style={styles.heading}>Operator access required</Text>
+          <Text style={styles.sub}>
+            This view is restricted to operator accounts. Flip is_operator on your
+            profile row in Supabase to grant it (production: separate admin surface
+            with audit trail).
+          </Text>
+        </View>
+      </Screen>
+    );
   }
-  const routes = [...byRoute.values()].sort((a, b) => b.live - a.live || b.members - a.members);
-
-  const open = reports.filter((r) => r.status === 'open');
-  const closed = reports.filter((r) => r.status !== 'open');
 
   return (
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
         <Text style={styles.banner}>
-          OPERATOR VIEW · DEMO ONLY — IN PRODUCTION THIS LIVES BEHIND ADMIN AUTH WITH AN
-          AUDIT TRAIL, NOT IN THE APP.
+          OPERATOR VIEW · SERVER-GATED (is_operator) — PRODUCTION MOVES THIS BEHIND
+          ADMIN AUTH WITH AN AUDIT TRAIL.
         </Text>
 
         <View style={{ gap: space(2.5) }}>
@@ -50,9 +68,8 @@ export default function Density() {
             Members with a declared pattern vs. checked in right now. Density — not raw
             signups — is the number that says whether matching works.
           </Text>
-          {routes.map((r) => (
-            <View key={r.route} style={styles.row}>
-              <Text style={styles.mono}>{modeCode(r.mode as never)}</Text>
+          {(data?.density ?? []).map((r) => (
+            <View key={r.rkey} style={styles.row}>
               <Text style={styles.route} numberOfLines={1}>
                 {r.route}
               </Text>
@@ -67,63 +84,45 @@ export default function Density() {
 
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.heading}>Meetup pulse</Text>
-          <Text style={styles.sub}>
-            One-tap feedback after PIN-verified meetups — the ground truth for “did a
-            real meeting happen and go well” (success metric §12).
-          </Text>
-          {meetupFeedback.length === 0 ? (
+          {(data?.feedback ?? []).length === 0 ? (
             <Text style={styles.sub}>No verified meetups with feedback yet.</Text>
           ) : (
-            meetupFeedback.map((f) => {
-              const about = users.find((u) => u.id === f.aboutUserId);
-              return (
-                <View key={f.id} style={styles.row}>
-                  <Text style={styles.mono}>{f.rating === 'good' ? '👍 GOOD' : '⚠ ISSUE'}</Text>
-                  <Text style={styles.route} numberOfLines={1}>
-                    about {about?.displayName ?? f.aboutUserId}
-                  </Text>
-                  <Text style={styles.mono}>{new Date(f.createdAt).toLocaleDateString()}</Text>
-                </View>
-              );
-            })
+            data!.feedback.map((f, i) => (
+              <View key={i} style={styles.row}>
+                <Text style={styles.mono}>{f.rating === 'good' ? '👍 GOOD' : '⚠ ISSUE'}</Text>
+                <Text style={styles.route} numberOfLines={1}>
+                  about {f.aboutName}
+                </Text>
+                <Text style={styles.mono}>{new Date(f.createdAt).toLocaleDateString()}</Text>
+              </View>
+            ))
           )}
         </View>
 
         <Hairline />
 
         <View style={{ gap: space(2.5) }}>
-          <Text style={styles.heading}>Review queue ({open.length} open)</Text>
+          <Text style={styles.heading}>Review queue ({data?.openReports.length ?? 0} open)</Text>
           <Text style={styles.sub}>
-            Human review with an SLA: 24h safety-flagged, 72h otherwise. Confirming a
-            report adds a strike (warn → suspend → ban).
+            Human review with an SLA: 24h safety-flagged, 72h otherwise. Confirming adds
+            a strike (warn → suspend → ban).
           </Text>
-          {open.length === 0 ? (
-            <Text style={styles.sub}>Queue is clear.</Text>
-          ) : (
-            open.map((r) => {
-              const reported = users.find((u) => u.id === r.reportedId);
-              const cat = REPORT_CATEGORIES.find((c) => c.value === r.category);
-              return (
-                <View key={r.id} style={styles.reportCard}>
-                  <Text style={styles.mono}>
-                    {cat?.label.toUpperCase()} · SLA {r.slaHours}H ·{' '}
-                    {reported ? `${reported.displayName} (${reported.strikes} strikes, ${reported.standing})` : r.reportedId}
-                  </Text>
-                  {r.context ? <Text style={styles.context}>{r.context}</Text> : null}
-                  <View style={{ flexDirection: 'row', gap: space(2.5) }}>
-                    <Button label="Confirm + strike" variant="destructive" onPress={() => resolveReport(r.id, true)} style={{ flex: 1 }} />
-                    <Button label="Dismiss" variant="quiet" onPress={() => resolveReport(r.id, false)} style={{ flex: 1 }} />
-                  </View>
-                </View>
-              );
-            })
-          )}
-          {closed.length > 0 ? (
-            <Text style={styles.sub}>
-              {closed.length} resolved/dismissed — every action here is audit-logged in
-              production.
-            </Text>
-          ) : null}
+          {(data?.openReports ?? []).map((r) => (
+            <View key={r.id} style={styles.reportCard}>
+              <Text style={styles.mono}>
+                {r.category.toUpperCase()} · SLA {r.slaHours}H · {r.reportedName} ({r.strikes} strikes, {r.standing})
+              </Text>
+              {r.context ? <Text style={styles.context}>{r.context}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: space(2.5) }}>
+                <Text style={styles.action} onPress={() => void resolve(r.id, true)}>
+                  CONFIRM + STRIKE
+                </Text>
+                <Text style={[styles.action, { color: color.textMutedOnChalk }]} onPress={() => void resolve(r.id, false)}>
+                  DISMISS
+                </Text>
+              </View>
+            </View>
+          ))}
         </View>
       </View>
     </Screen>
@@ -145,6 +144,7 @@ const styles = StyleSheet.create({
   mono: { ...type.monoSmall, color: color.textOnChalk },
   route: { ...type.bodyMedium, color: color.textOnChalk, flex: 1 },
   context: { ...type.caption, color: color.textMutedOnChalk },
+  action: { ...type.monoSmall, color: color.caution, paddingVertical: space(1) },
   reportCard: {
     backgroundColor: color.chalkRaised,
     borderWidth: 1,

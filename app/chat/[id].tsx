@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -12,16 +12,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChatMessage, ReasonTag } from '../../src/domain/types';
+import { ReasonTag } from '../../src/domain/types';
 import { LIMITS } from '../../src/domain/vocab';
 import { formatClock } from '../../src/lib/time';
-import { MY_ID, useStore } from '../../src/store/useStore';
+import { Message, useStore } from '../../src/store/useStore';
 import { color, font, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * In-app messaging (PRD §5.5): text-only, filtered before send. Blocked sends
- * explain themselves to the sender; the thread auto-expires 30 days after the
- * last message. Block / report / meetup PIN live in the header.
+ * In-app messaging (PRD §5.5): text-only, filtered client-side for instant
+ * feedback and server-side as the real boundary. New messages arrive live via
+ * Supabase Realtime. Threads expire 30 days after the last message.
  */
 
 /** Blank-first-message killers, keyed to why the match happened. Tap fills the draft. */
@@ -47,38 +47,34 @@ const OPENERS: Record<ReasonTag, string[]> = {
     'What does a typical week look like for you?',
   ],
 };
+
 export default function Chat() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const users = useStore((s) => s.users);
+  const myId = useStore((s) => s.myId);
   const connections = useStore((s) => s.connections);
   const messages = useStore((s) => s.messages);
-  const requests = useStore((s) => s.requests);
+  const loadMessages = useStore((s) => s.loadMessages);
+  const subscribeMessages = useStore((s) => s.subscribeMessages);
   const sendMessage = useStore((s) => s.sendMessage);
   const blockUser = useStore((s) => s.blockUser);
 
   const [draft, setDraft] = useState('');
   const [warning, setWarning] = useState<string | null>(null);
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlatList<Message>>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    void loadMessages(id);
+    const unsubscribe = subscribeMessages(id);
+    return unsubscribe;
+  }, [id, loadMessages, subscribeMessages]);
 
   const conn = connections.find((c) => c.id === id);
-  const other = conn ? users.find((u) => u.id === (conn.userA === MY_ID ? conn.userB : conn.userA)) : null;
-  const thread = messages.filter((m) => m.connectionId === id);
+  const thread = messages[id ?? ''] ?? [];
 
-  // The reason tag from the request that created this match drives the openers.
-  const matchReason =
-    (conn &&
-      requests.find(
-        (r) =>
-          r.status === 'accepted' &&
-          [r.fromUserId, r.toUserId].includes(conn.userA) &&
-          [r.fromUserId, r.toUserId].includes(conn.userB),
-      )?.reasonTag) ||
-    'expanding_network';
-  const openers = [...OPENERS[matchReason], OPENERS.expanding_network[0]].slice(0, 3);
-
-  if (!conn || !other) {
+  if (!conn) {
     return (
       <View style={styles.gone}>
         <Text style={type.body}>This conversation is no longer available.</Text>
@@ -86,10 +82,12 @@ export default function Chat() {
     );
   }
 
-  const send = () => {
+  const openers = [...OPENERS.expanding_network, OPENERS.career_conversation[0]].slice(0, 3);
+
+  const send = async () => {
     const text = draft.trim();
     if (!text) return;
-    const result = sendMessage(conn.id, text);
+    const result = await sendMessage(conn.id, text);
     if (!result.ok) {
       setWarning(result.message ?? 'Message blocked.');
       return;
@@ -101,7 +99,7 @@ export default function Chat() {
 
   const confirmBlock = () => {
     Alert.alert(
-      `Block ${other.displayName}?`,
+      `Block ${conn.otherName}?`,
       'They won’t be notified. This conversation closes and you disappear from each other everywhere.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -109,8 +107,7 @@ export default function Chat() {
           text: 'Block',
           style: 'destructive',
           onPress: () => {
-            blockUser(other.id);
-            router.back();
+            void blockUser(conn.otherId).then(() => router.back());
           },
         },
       ],
@@ -125,21 +122,21 @@ export default function Chat() {
     >
       <Stack.Screen
         options={{
-          title: other.displayName,
+          title: conn.otherName,
           headerRight: () => (
             <View style={{ flexDirection: 'row', gap: space(4) }}>
               <Pressable
-                onPress={() => router.push({ pathname: '/meetup/[id]', params: { id: conn.id } })}
+                onPress={() => router.push({ pathname: '/meetup/[id]', params: { id: conn.id, name: conn.otherName, otherId: conn.otherId } })}
                 accessibilityLabel="Meetup PIN verification"
               >
                 <Text style={styles.headerAction}>PIN</Text>
               </Pressable>
-              <Pressable onPress={confirmBlock} accessibilityLabel={`Block ${other.displayName}`}>
+              <Pressable onPress={confirmBlock} accessibilityLabel={`Block ${conn.otherName}`}>
                 <Text style={[styles.headerAction, { color: color.caution }]}>BLOCK</Text>
               </Pressable>
               <Pressable
-                onPress={() => router.push({ pathname: '/report', params: { reportedId: other.id } })}
-                accessibilityLabel={`Report ${other.displayName}`}
+                onPress={() => router.push({ pathname: '/report', params: { reportedId: conn.otherId, name: conn.otherName } })}
+                accessibilityLabel={`Report ${conn.otherName}`}
               >
                 <Text style={[styles.headerAction, { color: color.caution }]}>REPORT</Text>
               </Pressable>
@@ -160,7 +157,7 @@ export default function Chat() {
           </Text>
         }
         renderItem={({ item }) => {
-          const mine = item.senderId === MY_ID;
+          const mine = item.senderId === myId;
           return (
             <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
               <Text style={mine ? styles.msgMine : styles.msgTheirs}>{item.content}</Text>
@@ -196,7 +193,7 @@ export default function Chat() {
           style={styles.input}
           multiline
         />
-        <Pressable onPress={send} accessibilityRole="button" accessibilityLabel="Send" style={styles.send}>
+        <Pressable onPress={() => void send()} accessibilityRole="button" accessibilityLabel="Send" style={styles.send}>
           <Text style={styles.sendLabel}>SEND</Text>
         </Pressable>
       </View>

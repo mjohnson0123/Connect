@@ -2,16 +2,13 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../src/components/Screen';
 import { Button, Hairline } from '../src/components/ui';
-import { MY_ID, useStore } from '../src/store/useStore';
+import { useStore } from '../src/store/useStore';
 import { color, space, type } from '../src/theme/tokens';
 
 /** Safety center (PRD §5.7): policy, how the controls work, block management. */
 export default function Safety() {
-  const users = useStore((s) => s.users);
-  const blocks = useStore((s) => s.blocks);
+  const blocked = useStore((s) => s.blocked);
   const unblockUser = useStore((s) => s.unblockUser);
-
-  const myBlocks = blocks.filter((b) => b.blockerId === MY_ID);
 
   return (
     <Screen>
@@ -60,18 +57,15 @@ export default function Safety() {
 
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.heading}>Blocked users</Text>
-          {myBlocks.length === 0 ? (
+          {blocked.length === 0 ? (
             <Text style={styles.body}>You haven’t blocked anyone.</Text>
           ) : (
-            myBlocks.map((b) => {
-              const u = users.find((x) => x.id === b.blockedId);
-              return (
-                <View key={b.blockedId} style={styles.blockRow}>
-                  <Text style={styles.blockName}>{u?.displayName ?? 'Deleted user'}</Text>
-                  <Button label="Unblock" variant="quiet" onPress={() => unblockUser(b.blockedId)} />
-                </View>
-              );
-            })
+            blocked.map((b) => (
+              <View key={b.id} style={styles.blockRow}>
+                <Text style={styles.blockName}>{b.displayName || 'Member'}</Text>
+                <Button label="Unblock" variant="quiet" onPress={() => void unblockUser(b.id)} />
+              </View>
+            ))
           )}
         </View>
 

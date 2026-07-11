@@ -42,6 +42,7 @@ export default function AddPattern() {
   const [start, setStart] = useState('06:45');
   const [end, setEnd] = useState('07:30');
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const matches = useMemo(() => searchCatalog(mode, query), [mode, query]);
 
@@ -64,7 +65,7 @@ export default function AddPattern() {
   const toggleDay = (d: number) =>
     setDays((ds) => (ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]));
 
-  const submit = () => {
+  const submit = async () => {
     if (!route.trim() || !direction.trim()) {
       setError('Pick a route and direction.');
       return;
@@ -77,7 +78,8 @@ export default function AddPattern() {
       setError('Times must be HH:MM (24-hour), e.g. 06:45.');
       return;
     }
-    addPattern({
+    setBusy(true);
+    const err = await addPattern({
       mode,
       routeId: picked?.id,
       routeOrLine: route.trim(),
@@ -87,6 +89,11 @@ export default function AddPattern() {
       windowEnd: end,
       stationOrCode: station.trim().toUpperCase(),
     });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
     router.back();
   };
 
@@ -207,7 +214,7 @@ export default function AddPattern() {
             </View>
 
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Button label="Add to your board" onPress={submit} />
+            <Button label={busy ? 'Adding…' : 'Add to your board'} onPress={submit} disabled={busy} />
           </>
         )}
 

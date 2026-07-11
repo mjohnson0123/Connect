@@ -1,39 +1,35 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Button, Chip, Monogram, VerifiedBadge } from '../../src/components/ui';
 import { modeCode, reasonLabel } from '../../src/domain/vocab';
-import { isBlockedEitherWay, MY_ID, patternsMatch, useStore } from '../../src/store/useStore';
+import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * Identities behind the aggregate count (PRD §5.3): profile cards for people
- * checked in on this shared route/window. No positions, no map — membership
- * in a shared pattern is the only thing revealed.
+ * Identities behind the aggregate count (PRD §5.3). The route_people RPC only
+ * returns people with an active check-in on this shared route — no positions,
+ * no browsing beyond the shared pattern.
  */
 export default function PatternPeople() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const patterns = useStore((s) => s.patterns);
-  const checkIns = useStore((s) => s.checkIns);
-  const users = useStore((s) => s.users);
-  const blocks = useStore((s) => s.blocks);
+  const board = useStore((s) => s.board);
+  const people = useStore((s) => s.people);
+  const loadPeople = useStore((s) => s.loadPeople);
   const blockUser = useStore((s) => s.blockUser);
 
-  const pattern = patterns.find((p) => p.id === id);
-  if (!pattern) return null;
+  useFocusEffect(
+    useCallback(() => {
+      if (id) void loadPeople(id);
+    }, [id, loadPeople]),
+  );
 
-  const now = Date.now();
-  const people = checkIns
-    .filter((c) => c.activeUntil > now && c.userId !== MY_ID)
-    .filter((c) => {
-      const tp = patterns.find((p) => p.id === c.tripPatternId);
-      return !!tp && patternsMatch(pattern, tp);
-    })
-    .filter((c) => !isBlockedEitherWay(blocks, MY_ID, c.userId))
-    .map((c) => users.find((u) => u.id === c.userId))
-    .filter((u): u is NonNullable<typeof u> => !!u && u.standing !== 'banned' && u.standing !== 'suspended');
+  const entry = board.find((b) => b.pattern.id === id);
+  if (!entry) return null;
+  const pattern = entry.pattern;
+  const cards = people[id ?? ''] ?? [];
 
   const confirmBlock = (userId: string, name: string) => {
     Alert.alert(
@@ -41,7 +37,7 @@ export default function PatternPeople() {
       'They won’t be notified. You’ll disappear from each other everywhere — discovery, requests, and conversations.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => blockUser(userId) },
+        { text: 'Block', style: 'destructive', onPress: () => void blockUser(userId) },
       ],
     );
   };
@@ -57,16 +53,16 @@ export default function PatternPeople() {
           <Text style={styles.routeSub}>{pattern.direction}</Text>
         </View>
 
-        {people.length === 0 ? (
+        {cards.length === 0 ? (
           <Text style={styles.emptyLine}>
             Nobody who shares this route is checked in right now. Check in yourself so
             others can find you when they look.
           </Text>
         ) : (
-          people.map((u) => (
+          cards.map((u) => (
             <View key={u.id} style={styles.card}>
               <View style={styles.cardHead}>
-                <Monogram text={u.photo} />
+                <Monogram text={u.monogram} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
                     <Text style={styles.name}>{u.displayName}</Text>
@@ -84,18 +80,19 @@ export default function PatternPeople() {
               <View style={{ flexDirection: 'row', gap: space(2.5) }}>
                 <Button
                   label="Request to connect"
-                  onPress={() => router.push({ pathname: '/request/[userId]', params: { userId: u.id } })}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/request/[userId]',
+                      params: { userId: u.id, name: u.displayName },
+                    })
+                  }
                   style={{ flex: 1 }}
                 />
-                <Button
-                  label="Block"
-                  variant="quiet"
-                  onPress={() => confirmBlock(u.id, u.displayName)}
-                />
+                <Button label="Block" variant="quiet" onPress={() => confirmBlock(u.id, u.displayName)} />
                 <Button
                   label="Report"
                   variant="quiet"
-                  onPress={() => router.push({ pathname: '/report', params: { reportedId: u.id } })}
+                  onPress={() => router.push({ pathname: '/report', params: { reportedId: u.id, name: u.displayName } })}
                 />
               </View>
             </View>

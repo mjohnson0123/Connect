@@ -26,11 +26,12 @@ export default function RootLayout() {
     IBMPlexMono_400Regular,
     IBMPlexMono_500Medium,
   });
-  const ensureSeeds = useStore((s) => s.ensureSeeds);
-  const sweep = useStore((s) => s.sweep);
-  // Never block the app on font loading forever: some environments (Expo
-  // Snack, flaky networks) fail or stall the font fetch. After the grace
-  // period, render with system-font fallbacks instead of hanging on splash.
+  const boot = useStore((s) => s.boot);
+  const refresh = useStore((s) => s.refresh);
+  const booted = useStore((s) => s.booted);
+
+  // Never block the app on font loading forever: some environments fail or
+  // stall the fetch. After the grace period, render with system fallbacks.
   const [fontTimeout, setFontTimeout] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setFontTimeout(true), 6000);
@@ -38,24 +39,14 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    // Expiry enforcement runs on launch, on foreground, and every minute the
-    // app is open — stand-in for the backend's scheduled retention jobs.
-    ensureSeeds();
-    sweep();
+    void boot();
     const sub = AppState.addEventListener('change', (st) => {
-      if (st === 'active') {
-        ensureSeeds();
-        sweep();
-      }
+      if (st === 'active') void refresh();
     });
-    const interval = setInterval(sweep, 60_000);
-    return () => {
-      sub.remove();
-      clearInterval(interval);
-    };
-  }, [ensureSeeds, sweep]);
+    return () => sub.remove();
+  }, [boot, refresh]);
 
-  if (!fontsLoaded && !fontError && !fontTimeout) {
+  if ((!fontsLoaded && !fontError && !fontTimeout) || !booted) {
     return (
       <View
         style={{
