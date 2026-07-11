@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
-import { Button, Chip, Field } from '../../src/components/ui';
+import { Avatar, Button, Chip, Field } from '../../src/components/ui';
+import { pickProfilePhoto } from '../../src/lib/photoPicker';
 import { ReasonTag } from '../../src/domain/types';
 import { LIMITS, REASON_TAGS } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
@@ -17,6 +18,16 @@ export default function ProfileSetup() {
   const router = useRouter();
   const me = useStore((s) => s.me);
   const saveProfile = useStore((s) => s.saveProfile);
+  const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
+
+  const changePhoto = async () => {
+    const picked = await pickProfilePhoto();
+    if (!picked) return;
+    setBusy(true);
+    const err = await setAvatarFromBase64(picked);
+    setBusy(false);
+    if (err) setError(err);
+  };
 
   const [displayName, setDisplayName] = useState(me?.displayName ?? '');
   const [headline, setHeadline] = useState(me?.headline ?? '');
@@ -71,6 +82,10 @@ export default function ProfileSetup() {
   return (
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
+        <View style={styles.photoRow}>
+          <Avatar url={me?.avatarUrl} fallback={me?.photo ?? '·'} size={56} />
+          <Button label="Change photo" variant="quiet" onPress={() => void changePhoto()} />
+        </View>
         <Field label="Display name" value={displayName} onChangeText={setDisplayName} placeholder="Alex Rivera" />
         <Field
           label="Professional headline"
@@ -119,6 +134,7 @@ export default function ProfileSetup() {
 }
 
 const styles = StyleSheet.create({
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: space(4) },
   label: { ...type.monoSmall, color: color.textMutedOnChalk },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(2) },
   note: { ...type.caption, color: color.textMutedOnChalk },

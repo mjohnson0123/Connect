@@ -40,6 +40,12 @@
         {
           "cameraPermission": "Commuter Connect uses your camera once during sign-up to verify that your profile photo is really you. Verification images are deleted after the check completes."
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Commuter Connect accesses photos you select only to set your profile picture."
+        }
       ]
     ]
   }
