@@ -24,6 +24,7 @@ export interface PersonCard {
   id: string;
   displayName: string;
   monogram: string;
+  avatarUrl: string | null;
   headline: string;
   bio: string;
   industryTags: string[];
@@ -40,6 +41,7 @@ export interface RequestRow {
   createdAt: number;
   otherName: string;
   otherMonogram: string;
+  otherAvatarUrl: string | null;
   otherHeadline: string;
   otherVerified: boolean;
 }
@@ -49,6 +51,7 @@ export interface ConnectionRow {
   otherId: string;
   otherName: string;
   otherMonogram: string;
+  otherAvatarUrl: string | null;
   otherVerified: boolean;
   status: 'active' | 'expired';
   lastMessage: string | null;
@@ -88,6 +91,8 @@ interface AppState {
   confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<string | null>;
   /** Uploads the selfie to private storage and records the verification. */
   submitVerification: (imageBase64: string | null) => Promise<string | null>;
+  /** Opt-in: publish the verified selfie as the profile photo. */
+  setAvatarFromBase64: (imageBase64: string) => Promise<string | null>;
   completeVerification: () => Promise<void>;
   saveProfile: (p: {
     displayName: string; monogram: string; headline: string; bio: string;
@@ -134,6 +139,7 @@ function mapProfile(row: Record<string, unknown>): User {
     id: row.id as string,
     displayName: (row.display_name as string) ?? '',
     photo: (row.monogram as string) ?? '·',
+    avatarUrl: (row.avatar_url as string) ?? null,
     verificationStatus: row.verification_status as User['verificationStatus'],
     headline: (row.headline as string) ?? '',
     bio: (row.bio as string) ?? '',
@@ -212,8 +218,8 @@ export const useStore = create<AppState>()(
           supabase.from('trip_patterns').select('*').order('created_at'),
           supabase.rpc('board_summary'),
           supabase.from('check_ins').select('pattern_id, active_until'),
-          supabase.from('connection_requests').select('*, from_profile:profiles!connection_requests_from_user_fkey(display_name, monogram, headline, verification_status), to_profile:profiles!connection_requests_to_user_fkey(display_name, monogram, headline, verification_status)').eq('status', 'pending'),
-          supabase.from('connections').select('*, a:profiles!connections_user_a_fkey(id, display_name, monogram, verification_status), b:profiles!connections_user_b_fkey(id, display_name, monogram, verification_status), messages(content, created_at)').order('created_at', { ascending: false }),
+          supabase.from('connection_requests').select('*, from_profile:profiles!connection_requests_from_user_fkey(display_name, monogram, headline, verification_status, avatar_url), to_profile:profiles!connection_requests_to_user_fkey(display_name, monogram, headline, verification_status, avatar_url)').eq('status', 'pending'),
+          supabase.from('connections').select('*, a:profiles!connections_user_a_fkey(id, display_name, monogram, verification_status, avatar_url), b:profiles!connections_user_b_fkey(id, display_name, monogram, verification_status, avatar_url), messages(content, created_at)').order('created_at', { ascending: false }),
           supabase.rpc('blocked_profiles'),
         ]);
 
@@ -238,6 +244,7 @@ export const useStore = create<AppState>()(
           createdAt: new Date(r.created_at).getTime(),
           otherName: other?.display_name ?? 'Member',
           otherMonogram: other?.monogram ?? '·',
+          otherAvatarUrl: other?.avatar_url ?? null,
           otherHeadline: other?.headline ?? '',
           otherVerified: other?.verification_status === 'verified',
         });
@@ -251,6 +258,7 @@ export const useStore = create<AppState>()(
             otherId: other?.id ?? '',
             otherName: other?.display_name ?? 'Member',
             otherMonogram: other?.monogram ?? '·',
+            otherAvatarUrl: other?.avatar_url ?? null,
             otherVerified: other?.verification_status === 'verified',
             status: c.status as 'active' | 'expired',
             lastMessage: last?.content ?? null,
@@ -343,6 +351,26 @@ export const useStore = create<AppState>()(
         return null;
       },
 
+      setAvatarFromBase64: async (imageBase64) => {
+        const myId = get().myId;
+        if (!myId) return 'Not signed in.';
+        const { decode } = await import('base64-arraybuffer');
+        const path = `${myId}/avatar.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(path, decode(imageBase64), { contentType: 'image/jpeg', upsert: true });
+        if (uploadError) return `Upload failed: ${uploadError.message}`;
+        const publicUrl = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+        // Cache-bust so a re-verified photo replaces the old one everywhere.
+        const { error } = await supabase
+          .from('profiles')
+          .update({ avatar_url: `${publicUrl}?v=${Date.now()}` })
+          .eq('id', myId);
+        if (error) return error.message;
+        await get().refresh();
+        return null;
+      },
+
       completeVerification: async () => {
         await supabase.rpc('complete_verification');
         await get().refresh();
@@ -409,6 +437,7 @@ export const useStore = create<AppState>()(
               id: r.id,
               displayName: r.display_name,
               monogram: r.monogram,
+              avatarUrl: r.avatar_url ?? null,
               headline: r.headline,
               bio: r.bio,
               industryTags: r.industry_tags ?? [],

@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
-import { Button, Chip, Hairline, Monogram, VerifiedBadge } from '../../src/components/ui';
+import { Avatar, Button, Chip, Hairline, VerifiedBadge } from '../../src/components/ui';
 import { reasonLabel } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
@@ -37,7 +37,7 @@ export default function You() {
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(2) }}>
         <View style={styles.head}>
-          <Monogram text={me.photo} size={56} />
+          <Avatar url={me.avatarUrl} fallback={me.photo} size={56} />
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
               <Text style={styles.name}>{me.displayName}</Text>

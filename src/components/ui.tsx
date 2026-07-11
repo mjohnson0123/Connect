@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -142,6 +143,26 @@ export function SignalDot() {
       ) : null}
       <View style={styles.dot} />
     </View>
+  );
+}
+
+/** Profile photo with monogram fallback. Photos come from the verified selfie (opt-in). */
+export function Avatar({
+  url,
+  fallback,
+  size = 44,
+}: {
+  url?: string | null;
+  fallback: string;
+  size?: number;
+}) {
+  if (!url) return <Monogram text={fallback} size={size} />;
+  return (
+    <Image
+      source={{ uri: url }}
+      accessibilityLabel="Profile photo"
+      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color.inkSoft }}
+    />
   );
 }
 

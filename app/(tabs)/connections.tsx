@@ -3,7 +3,7 @@ import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import BoardRow from '../../src/components/BoardRow';
 import Screen from '../../src/components/Screen';
-import { Button, Monogram, VerifiedBadge } from '../../src/components/ui';
+import { Avatar, Button, VerifiedBadge } from '../../src/components/ui';
 import { reasonLabel } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
@@ -47,7 +47,7 @@ export default function Connections() {
             requestsIn.map((r) => (
               <View key={r.id} style={styles.requestCard}>
                 <View style={styles.requestHead}>
-                  <Monogram text={r.otherMonogram} />
+                  <Avatar url={r.otherAvatarUrl} fallback={r.otherMonogram} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
                       <Text style={styles.name}>{r.otherName}</Text>

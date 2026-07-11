@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Button } from '../../src/components/ui';
 import { useStore } from '../../src/store/useStore';
@@ -16,9 +16,12 @@ import { color, radius, space, type } from '../../src/theme/tokens';
 export default function Verify() {
   const router = useRouter();
   const submitVerification = useStore((s) => s.submitVerification);
+  const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
   const [permission, requestPermission] = useCameraPermissions();
-  const [phase, setPhase] = useState<'intro' | 'camera' | 'checking' | 'done'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'camera' | 'checking' | 'photo' | 'done'>('intro');
   const [error, setError] = useState<string | null>(null);
+  const [captured, setCaptured] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
   const finish = async (imageBase64: string | null) => {
@@ -33,6 +36,28 @@ export default function Verify() {
       setPhase('intro');
       return;
     }
+    if (imageBase64) {
+      // One capture, two jobs: offer the verified selfie as the profile
+      // photo. The photo shown on profiles is guaranteed to be the person
+      // who passed verification — nobody can upload a face that isn't them.
+      setCaptured(imageBase64);
+      setPhase('photo');
+      return;
+    }
+    setPhase('done');
+    setTimeout(() => router.replace('/onboarding/profile'), 900);
+  };
+
+  const usePhoto = async (yes: boolean) => {
+    if (yes && captured) {
+      setBusy(true);
+      const err = await setAvatarFromBase64(captured);
+      setBusy(false);
+      if (err) {
+        setError(err);
+      }
+    }
+    setCaptured(null);
     setPhase('done');
     setTimeout(() => router.replace('/onboarding/profile'), 900);
   };
@@ -97,6 +122,25 @@ export default function Verify() {
           </View>
         )}
 
+        {phase === 'photo' && (
+          <View style={{ gap: space(4) }}>
+            {captured ? (
+              <Image
+                source={{ uri: `data:image/jpeg;base64,${captured}` }}
+                style={styles.photoPreview}
+                accessibilityLabel="Your verified selfie"
+              />
+            ) : null}
+            <Text style={styles.title}>Use this photo on your profile?</Text>
+            <Text style={styles.body}>
+              People decide who to connect with partly by seeing a real face — and this
+              one is verified as you. You can skip and show your initials instead.
+            </Text>
+            <Button label={busy ? 'Saving…' : 'Use as profile photo'} onPress={() => void usePhoto(true)} disabled={busy} />
+            <Button label="Skip — show my initials" variant="quiet" onPress={() => void usePhoto(false)} disabled={busy} />
+          </View>
+        )}
+
         {phase === 'done' && (
           <View style={{ gap: space(3), alignItems: 'center' }}>
             <View style={styles.verifiedRing}>
@@ -117,6 +161,15 @@ const styles = StyleSheet.create({
   body: { ...type.body, color: color.textMutedOnChalk },
   caution: { ...type.caption, color: color.caution },
   mono: { ...type.mono, color: color.textOnChalk },
+  photoPreview: {
+    width: 132,
+    height: 132,
+    borderRadius: 66,
+    alignSelf: 'center',
+    backgroundColor: color.ink,
+    borderWidth: 2,
+    borderColor: color.signal,
+  },
   cameraFrame: {
     flex: 1,
     maxHeight: 420,

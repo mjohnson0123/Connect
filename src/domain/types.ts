@@ -18,8 +18,10 @@ export type ReasonTag =
 export interface User {
   id: string;
   displayName: string;
-  /** Emoji/initial placeholder in the mock; a real backend stores a verified photo URL. */
+  /** Monogram initials, the fallback when no photo is set. */
   photo: string;
+  /** Public URL of the profile photo (opt-in copy of the verified selfie). */
+  avatarUrl: string | null;
   verificationStatus: VerificationStatus;
   headline: string;
   bio: string;
