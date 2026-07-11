@@ -134,6 +134,9 @@ interface AppState {
 
 const DAY = 86_400_000;
 
+/** Single-flight guard for refresh(); see refresh() for why. */
+let refreshInFlight: Promise<void> | null = null;
+
 function mapProfile(row: Record<string, unknown>): User {
   return {
     id: row.id as string,
@@ -200,7 +203,9 @@ export const useStore = create<AppState>()(
               myId: next, me: null, patterns: [], board: [], people: {},
               requestsIn: [], requestsOut: [], connections: [], messages: {}, blocked: [],
             });
-            if (next) void get().refresh();
+            // Deferred: supabase-js holds an internal auth lock during this
+            // callback; calling back into the client here can deadlock.
+            if (next) setTimeout(() => void get().refresh(), 0);
           }
         });
         if (data.session) await get().refresh();
@@ -209,6 +214,19 @@ export const useStore = create<AppState>()(
       refresh: async () => {
         const myId = get().myId;
         if (!myId) return;
+        // Serialize: focus effects, AppState, and post-action calls can
+        // overlap; interleaved responses would clobber state with stale data.
+        if (refreshInFlight) return refreshInFlight;
+        refreshInFlight = (async () => {
+          try {
+            await doRefresh();
+          } finally {
+            refreshInFlight = null;
+          }
+        })();
+        return refreshInFlight;
+
+        async function doRefresh() {
 
         // Pilot demo scaffolding: keeps demo riders checked in + one inbound request.
         await supabase.rpc('demo_bootstrap');
@@ -280,6 +298,7 @@ export const useStore = create<AppState>()(
           blocked: ((blockedRes.data ?? []) as { id: string; display_name: string }[])
             .map((b) => ({ id: b.id, displayName: b.display_name })),
         });
+        }
       },
 
       signUp: async (email, password, dob) => {

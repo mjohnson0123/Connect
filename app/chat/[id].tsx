@@ -36,6 +36,7 @@ export default function Chat() {
   const blockUser = useStore((s) => s.blockUser);
 
   const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
   const [warning, setWarning] = useState<string | null>(null);
   const listRef = useRef<FlatList<Message>>(null);
 
@@ -59,8 +60,10 @@ export default function Chat() {
 
   const send = async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || sending) return; // double-tap on SEND must not send twice
+    setSending(true);
     const result = await sendMessage(conn.id, text);
+    setSending(false);
     if (!result.ok) {
       setWarning(result.message ?? 'Message blocked.');
       return;
