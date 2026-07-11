@@ -84,6 +84,10 @@ interface AppState {
   signIn: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<string | null>;
+  confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<string | null>;
+  /** Uploads the selfie to private storage and records the verification. */
+  submitVerification: (imageBase64: string | null) => Promise<string | null>;
   completeVerification: () => Promise<void>;
   saveProfile: (p: {
     displayName: string; monogram: string; headline: string; bio: string;
@@ -298,6 +302,45 @@ export const useStore = create<AppState>()(
       deleteAccount: async () => {
         await supabase.rpc('delete_account');
         await supabase.auth.signOut();
+      },
+
+      requestPasswordReset: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+        return error ? authErrorText(error.message) : null;
+      },
+
+      confirmPasswordReset: async (email, code, newPassword) => {
+        if (newPassword.length < 8) return 'Password needs at least 8 characters.';
+        const { error } = await supabase.auth.verifyOtp({
+          email: email.trim(),
+          token: code.trim(),
+          type: 'recovery',
+        });
+        if (error) return 'That code isn’t valid or has expired — request a new one.';
+        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+        if (updateError) return authErrorText(updateError.message);
+        await get().refresh();
+        return null;
+      },
+
+      submitVerification: async (imageBase64) => {
+        const myId = get().myId;
+        if (!myId) return 'Not signed in.';
+        let imagePath: string | null = null;
+        if (imageBase64) {
+          // Private bucket; RLS limits writes to the caller's own folder and
+          // reads to the verification pipeline (PRD §5.1 / §7).
+          const { decode } = await import('base64-arraybuffer');
+          imagePath = `${myId}/selfie-${Date.now()}.jpg`;
+          const { error: uploadError } = await supabase.storage
+            .from('verifications')
+            .upload(imagePath, decode(imageBase64), { contentType: 'image/jpeg' });
+          if (uploadError) return `Upload failed: ${uploadError.message}`;
+        }
+        const { error } = await supabase.rpc('submit_verification', { p_image_path: imagePath });
+        if (error) return error.message;
+        await get().refresh();
+        return null;
       },
 
       completeVerification: async () => {

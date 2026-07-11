@@ -56,6 +56,11 @@ export default function SignIn() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button label={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
         <Button
+          label="Forgot password?"
+          variant="quiet"
+          onPress={() => router.push('/onboarding/forgot')}
+        />
+        <Button
           label="New here? Create an account"
           variant="quiet"
           onPress={() => router.replace('/onboarding/signup')}

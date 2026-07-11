@@ -74,12 +74,13 @@ export default function Connections() {
               Accepted connections appear here and open a private, in-app conversation.
             </Text>
           ) : (
-            active.map((c) => (
+            active.map((c, i) => (
               <BoardRow
                 key={c.id}
                 left={c.otherMonogram}
                 title={c.otherName}
                 subtitle={c.lastMessage ?? 'Say hello — threads expire 30 days after the last message.'}
+                index={i}
                 onPress={() => router.push({ pathname: '/chat/[id]', params: { id: c.id } })}
               />
             ))

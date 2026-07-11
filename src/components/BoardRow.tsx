@@ -1,5 +1,6 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useReduceMotion } from '../lib/useReduceMotion';
 import { color, font, radius, space, type } from '../theme/tokens';
 import { SignalDot } from './ui';
 
@@ -16,6 +17,7 @@ export default function BoardRow({
   live,
   onPress,
   right,
+  index = 0,
 }: {
   left: string;
   leftSub?: string;
@@ -24,8 +26,30 @@ export default function BoardRow({
   live?: boolean;
   onPress?: () => void;
   right?: React.ReactNode;
+  /** Position in its list — rows populate top-down like a board updating. */
+  index?: number;
 }) {
+  const reduceMotion = useReduceMotion();
+  const enter = useRef(new Animated.Value(reduceMotion ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      enter.setValue(1);
+      return;
+    }
+    Animated.timing(enter, {
+      toValue: 1,
+      duration: 320,
+      delay: Math.min(index, 8) * 60,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [enter, index, reduceMotion]);
+
+  const translateY = enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+
   return (
+    <Animated.View style={{ opacity: enter, transform: [{ translateY }] }}>
     <Pressable
       onPress={onPress}
       disabled={!onPress}
@@ -57,6 +81,7 @@ export default function BoardRow({
       </View>
       {right ? <View style={styles.right}>{right}</View> : null}
     </Pressable>
+    </Animated.View>
   );
 }
 

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  Animated,
+  Easing,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -9,6 +11,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { useReduceMotion } from '../lib/useReduceMotion';
 import { color, font, radius, space, type } from '../theme/tokens';
 
 /** Small shared primitives, styled to the token system — no component-library skin. */
@@ -49,7 +52,11 @@ export function Button({
       accessibilityLabel={label}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, opacity: disabled ? 0.4 : pressed ? 0.85 : 1 },
+        {
+          backgroundColor: bg,
+          opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
+        },
         quietBorder && styles.buttonQuiet,
         variant === 'quietOnInk' && { borderColor: 'rgba(237, 238, 233, 0.35)' },
         style,
@@ -109,7 +116,33 @@ export function VerifiedBadge({ compact }: { compact?: boolean }) {
 }
 
 export function SignalDot() {
-  return <View style={styles.dot} accessibilityLabel="Checked in now" />;
+  const reduceMotion = useReduceMotion();
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    // Gentle breathing pulse — "live" should feel alive, not blink for attention.
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse, reduceMotion]);
+
+  const halo = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 2.1] });
+  const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] });
+
+  return (
+    <View style={styles.dotWrap} accessibilityLabel="Checked in now">
+      {!reduceMotion ? (
+        <Animated.View style={[styles.dotHalo, { opacity: haloOpacity, transform: [{ scale: halo }] }]} />
+      ) : null}
+      <View style={styles.dot} />
+    </View>
+  );
 }
 
 export function Monogram({ text, size = 44 }: { text: string; size?: number }) {
@@ -174,7 +207,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   badgeText: { fontFamily: font.mono, fontSize: 10, letterSpacing: 0.8, color: color.chalk },
+  dotWrap: { width: 9, height: 9, alignItems: 'center', justifyContent: 'center' },
   dot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: color.signal,
+  },
+  dotHalo: {
+    position: 'absolute',
     width: 9,
     height: 9,
     borderRadius: 5,

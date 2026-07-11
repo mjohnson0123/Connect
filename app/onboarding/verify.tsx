@@ -15,37 +15,43 @@ import { color, radius, space, type } from '../../src/theme/tokens';
  */
 export default function Verify() {
   const router = useRouter();
-  const completeVerification = useStore((s) => s.completeVerification);
+  const submitVerification = useStore((s) => s.submitVerification);
   const [permission, requestPermission] = useCameraPermissions();
   const [phase, setPhase] = useState<'intro' | 'camera' | 'checking' | 'done'>('intro');
+  const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
-  const finish = () => {
+  const finish = async (imageBase64: string | null) => {
     setPhase('checking');
-    // Simulated liveness service round-trip; the verified flag is set
-    // server-side (complete_verification RPC). Production: capture → encrypted
-    // upload → vendor liveness + face-match → delete image → webhook sets flag.
-    setTimeout(() => {
-      void completeVerification().then(() => {
-        setPhase('done');
-        setTimeout(() => router.replace('/onboarding/profile'), 900);
-      });
-    }, 1800);
+    setError(null);
+    // The selfie uploads to a private storage bucket and a verification row
+    // is recorded server-side. Liveness scoring is the vendor integration
+    // that slots in next; the storage + record pipeline is real now.
+    const err = await submitVerification(imageBase64);
+    if (err) {
+      setError(err);
+      setPhase('intro');
+      return;
+    }
+    setPhase('done');
+    setTimeout(() => router.replace('/onboarding/profile'), 900);
   };
 
   const capture = async () => {
+    let base64: string | null = null;
     try {
-      await cameraRef.current?.takePictureAsync({ skipProcessing: true });
+      const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.6 });
+      base64 = photo?.base64 ?? null;
     } catch {
-      // Capture can fail on simulators/web — the simulated check proceeds regardless.
+      // Capture can fail on simulators — submit without an image rather than dead-end.
     }
-    finish();
+    await finish(base64);
   };
 
   const start = async () => {
     if (Platform.OS === 'web') {
       // Web preview build: camera capture isn't part of the product surface.
-      finish();
+      await finish(null);
       return;
     }
     const res = permission?.granted ? permission : await requestPermission();
@@ -64,6 +70,7 @@ export default function Verify() {
               verification and is deleted as soon as it completes.
             </Text>
             <Button label="Take selfie" onPress={start} />
+            {error ? <Text style={styles.caution}>{error}</Text> : null}
             {permission && !permission.granted && !permission.canAskAgain ? (
               <Text style={styles.caution}>
                 Camera access is off for this app. Enable it in system settings to verify —
@@ -79,7 +86,7 @@ export default function Verify() {
               <CameraView ref={cameraRef} style={styles.camera} facing="front" />
             </View>
             <Text style={styles.body}>Center your face and hold still.</Text>
-            <Button label="Capture" onPress={capture} />
+            <Button label="Capture" onPress={() => void capture()} />
           </View>
         )}
 

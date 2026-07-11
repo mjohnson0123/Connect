@@ -44,7 +44,7 @@ export default function Board() {
         </View>
       ) : (
         <View style={{ gap: space(2.5) }}>
-          {board.map(({ pattern, liveCount, memberCount, checkedInUntil }) => {
+          {board.map(({ pattern, liveCount, memberCount, checkedInUntil }, i) => {
             const checkedIn = !!checkedInUntil && checkedInUntil > now;
             return (
               <BoardRow
@@ -62,6 +62,7 @@ export default function Board() {
                         : 'You’re first on this route — it grows from here'
                 }
                 live={checkedIn}
+                index={i}
                 onPress={() => router.push({ pathname: '/pattern/[id]', params: { id: pattern.id } })}
               />
             );
