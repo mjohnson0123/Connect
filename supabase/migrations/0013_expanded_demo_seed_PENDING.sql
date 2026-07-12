@@ -31,6 +31,10 @@ from (values
 on conflict (id) do nothing;
 
 -- ── Profiles (industry tags drawn from the INDUSTRIES vocab so they match) ───
+-- Setting verification_status = 'verified' trips guard_protected_profile_cols,
+-- so raise the same bypass flag the verification flow uses, for this seed.
+select set_config('app.allow_protected', '1', false);
+
 update public.profiles set (display_name, monogram, headline, bio, industry_tags, reason_tags, verification_status, is_demo) =
   (v.dn, v.mono, v.hl, v.bio, v.ind, v.rsn, v.vs, true)
 from (values
@@ -72,6 +76,8 @@ values
   ('22222222-2222-4222-8222-222222222216','11111111-1111-4111-8111-111111111116','flight',null,'BWI → BOS','One way',array[1],'08:00','10:00','BWI')
   -- Wes/Iris/Cole intentionally have NO route: they only appear via interest discovery.
 on conflict (id) do nothing;
+
+select set_config('app.allow_protected', '0', false);
 
 -- demo_bootstrap() already checks in every demo rider that has a pattern
 -- (except Jules), so these light up on the board on next app open.
