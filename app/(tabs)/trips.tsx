@@ -111,8 +111,12 @@ export default function Trips() {
                         disabled={busyId === p.id}
                         onPress={() => {
                           setBusyId(p.id);
-                          void checkIn(p.id).then(() => {
+                          void checkIn(p.id).then((err) => {
                             setBusyId(null);
+                            if (err) {
+                              Alert.alert('Check-in didn’t go through', err);
+                              return;
+                            }
                             setJustCheckedIn(p.id);
                           });
                         }}

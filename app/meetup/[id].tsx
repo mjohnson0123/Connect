@@ -34,7 +34,14 @@ export default function Meetup() {
   const otherName = name ?? 'your connection';
 
   useEffect(() => {
-    if (id) void pinVerified(id).then(setAlreadyVerified);
+    if (!id) return;
+    void pinVerified(id).then(setAlreadyVerified);
+    // The generator's screen should flip to VERIFIED when the other person
+    // confirms — poll while unverified (no realtime channel on pins).
+    const t = setInterval(() => {
+      void pinVerified(id).then((v) => v && setAlreadyVerified(true));
+    }, 5000);
+    return () => clearInterval(t);
   }, [id, pinVerified]);
 
   useEffect(() => {

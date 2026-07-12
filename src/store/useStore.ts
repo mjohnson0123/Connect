@@ -67,6 +67,8 @@ export interface Message {
 
 interface AppState {
   booted: boolean;
+  /** Last refresh failed (offline, server error) — screens can offer retry. */
+  refreshError: boolean;
   myId: string | null;
   me: User | null;
   patterns: TripPattern[];
@@ -104,7 +106,7 @@ interface AppState {
     daysOfWeek: number[]; windowStart: string; windowEnd: string; stationOrCode: string;
   }) => Promise<string | null>;
   removePattern: (id: string) => Promise<void>;
-  checkIn: (patternId: string) => Promise<void>;
+  checkIn: (patternId: string) => Promise<string | null>;
   endCheckIn: (patternId: string) => Promise<void>;
   loadPeople: (patternId: string) => Promise<void>;
 
@@ -168,11 +170,13 @@ function mapPattern(row: Record<string, unknown>): TripPattern {
   };
 }
 
-function authErrorText(message: string): string {
+function friendlyError(message: string): string {
   if (/invalid login credentials/i.test(message)) return 'That email and password don’t match.';
+  if (/email not confirmed/i.test(message)) return 'Confirm your email first — check your inbox for the link.';
   if (/already registered/i.test(message)) return 'An account with this email already exists — sign in instead.';
   if (/password/i.test(message)) return 'Password needs at least 8 characters.';
   if (/rate limit/i.test(message)) return 'Too many attempts — wait a minute and try again.';
+  if (/network|fetch|failed to/i.test(message)) return 'No connection — try again when you’re back online.';
   return message;
 }
 
@@ -180,6 +184,7 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       booted: false,
+      refreshError: false,
       myId: null,
       me: null,
       patterns: [],
@@ -220,6 +225,11 @@ export const useStore = create<AppState>()(
         refreshInFlight = (async () => {
           try {
             await doRefresh();
+            set({ refreshError: false });
+          } catch {
+            // Commuters are offline half the time (tunnels, dead zones):
+            // a failed refresh must never hang or crash the app.
+            set({ refreshError: true });
           } finally {
             refreshInFlight = null;
           }
@@ -307,7 +317,7 @@ export const useStore = create<AppState>()(
           return 'Commuter Connect is for adults 18 and over.';
         }
         const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error) return authErrorText(error.message);
+        if (error) return friendlyError(error.message);
         if (!data.session) {
           return 'CONFIRM_EMAIL';
         }
@@ -317,7 +327,7 @@ export const useStore = create<AppState>()(
 
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return authErrorText(error.message);
+        if (error) return friendlyError(error.message);
         await get().refresh();
         return null;
       },
@@ -333,7 +343,7 @@ export const useStore = create<AppState>()(
 
       requestPasswordReset: async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
-        return error ? authErrorText(error.message) : null;
+        return error ? friendlyError(error.message) : null;
       },
 
       confirmPasswordReset: async (email, code, newPassword) => {
@@ -345,7 +355,7 @@ export const useStore = create<AppState>()(
         });
         if (error) return 'That code isn’t valid or has expired — request a new one.';
         const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-        if (updateError) return authErrorText(updateError.message);
+        if (updateError) return friendlyError(updateError.message);
         await get().refresh();
         return null;
       },
@@ -398,6 +408,12 @@ export const useStore = create<AppState>()(
       saveProfile: async (p) => {
         const myId = get().myId;
         if (!myId) return 'Not signed in.';
+        // The no-contact-info policy applies to profiles too, not just chat.
+        const profileText = `${p.displayName} ${p.headline} ${p.bio} ${p.industryTags.join(' ')}`;
+        const filtered = filterMessage(profileText);
+        if (!filtered.ok) {
+          return 'Profiles can’t include phone numbers, emails, links, or social handles.';
+        }
         const { error } = await supabase.from('profiles').update({
           display_name: p.displayName,
           monogram: p.monogram,
@@ -438,8 +454,13 @@ export const useStore = create<AppState>()(
       },
 
       checkIn: async (patternId) => {
-        await supabase.rpc('check_in', { p_pattern_id: patternId });
-        await get().refresh();
+        try {
+          const { error } = await supabase.rpc('check_in', { p_pattern_id: patternId });
+          await get().refresh();
+          return error ? friendlyError(error.message) : null;
+        } catch {
+          return 'No connection — try again when you’re back online.';
+        }
       },
 
       endCheckIn: async (patternId) => {

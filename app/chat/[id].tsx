@@ -126,6 +126,7 @@ export default function Chat() {
         data={thread}
         keyExtractor={(m) => m.id}
         contentContainerStyle={{ padding: space(4), gap: space(2) }}
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListHeaderComponent={
           <Text style={styles.expiryNote}>
             Text-only and in-app. This thread auto-expires {LIMITS.chatExpiryDays} days

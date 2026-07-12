@@ -29,6 +29,7 @@ const TIME = /^([01]?\d|2[0-3]):[0-5]\d$/;
 export default function AddPattern() {
   const router = useRouter();
   const addPattern = useStore((s) => s.addPattern);
+  const patterns = useStore((s) => s.patterns);
 
   const [mode, setMode] = useState<TravelMode>('train');
   const [agency, setAgency] = useState('');
@@ -79,6 +80,15 @@ export default function AddPattern() {
     }
     if (!TIME.test(start) || !TIME.test(end)) {
       setError('Times must be HH:MM (24-hour), e.g. 06:45.');
+      return;
+    }
+    if (end <= start) {
+      setError('The window has to end after it starts.');
+      return;
+    }
+    const newKey = routeKeyFor(mode, undefined, composed.routeOrLine, composed.direction);
+    if (patterns.some((pt) => routeKeyFor(pt.mode, pt.routeId, pt.routeOrLine, pt.direction) === newKey)) {
+      setError('This route is already on your board.');
       return;
     }
     setBusy(true);

@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import BoardRow from '../../src/components/BoardRow';
 import Screen from '../../src/components/Screen';
@@ -24,6 +24,13 @@ export default function Board() {
       void refresh();
     }, [refresh]),
   );
+
+  // Tick each half-minute so "Xm left" and expired check-ins roll over live.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
 
   const now = Date.now();
 
