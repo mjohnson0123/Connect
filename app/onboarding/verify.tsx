@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Button } from '../../src/components/ui';
-import { pickProfilePhoto } from '../../src/lib/photoPicker';
+import { chooseProfilePhoto } from '../../src/lib/photoPicker';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
@@ -68,7 +68,7 @@ export default function Verify() {
   };
 
   const uploadDifferent = async () => {
-    const picked = await pickProfilePhoto();
+    const picked = await chooseProfilePhoto();
     if (!picked) return; // cancelled — stay on the choice screen
     setBusy(true);
     const err = await setAvatarFromBase64(picked);
@@ -155,7 +155,7 @@ export default function Verify() {
               one is verified as you. You can skip and show your initials instead.
             </Text>
             <Button label={busy ? 'Saving…' : 'Use as profile photo'} onPress={() => void usePhoto(true)} disabled={busy} />
-            <Button label="Upload a different photo" variant="ink" onPress={() => void uploadDifferent()} disabled={busy} />
+            <Button label="Use a different photo" variant="ink" onPress={() => void uploadDifferent()} disabled={busy} />
             <Button label="Skip — show my initials" variant="quiet" onPress={() => void usePhoto(false)} disabled={busy} />
           </View>
         )}

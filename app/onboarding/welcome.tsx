@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SplitFlap from '../../src/components/SplitFlap';
 import { Button } from '../../src/components/ui';
 import { useReduceMotion } from '../../src/lib/useReduceMotion';
-import { color, space, type } from '../../src/theme/tokens';
+import { color, font, space, type } from '../../src/theme/tokens';
 
 /**
  * Ink splash — one of the few high-emphasis Ink moments (PRD §10).
@@ -50,9 +50,7 @@ export default function Welcome() {
           <SplitFlap text="CONNECT" frames={FRAMES_BOTTOM} cellSize={36} />
         </View>
         <Rise delay={2400} reduceMotion={reduceMotion}>
-          <Text style={styles.pitch}>
-            You’ve probably sat three rows from your next mentor.{'\n'}Let’s fix that.
-          </Text>
+          <Text style={styles.pitch}>Your network is already on board.</Text>
         </Rise>
       </View>
 
@@ -86,7 +84,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space(6),
     justifyContent: 'space-between',
   },
-  pitch: { ...type.body, fontSize: 17, lineHeight: 26, color: color.textMutedOnInk },
+  pitch: { fontFamily: font.displaySemi, fontSize: 20, lineHeight: 27, color: color.chalk },
   rules: { gap: space(1.5), marginBottom: space(2) },
   rule: { ...type.caption, color: color.textMutedOnInk },
   legal: { ...type.caption, fontSize: 11, lineHeight: 15, color: color.textMutedOnInk, textAlign: 'center' },

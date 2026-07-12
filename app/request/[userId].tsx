@@ -73,10 +73,6 @@ export default function RequestCompose() {
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button label={busy ? 'Sending…' : 'Send request'} onPress={submit} disabled={busy} />
-        <Text style={styles.note}>
-          Up to {LIMITS.requestsPerDay} requests a day. Pitches, selling, and recruiting
-          cold-outreach aren’t allowed and are reportable.
-        </Text>
       </View>
     </Screen>
   );

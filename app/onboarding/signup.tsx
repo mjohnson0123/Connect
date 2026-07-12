@@ -23,6 +23,14 @@ export default function SignUp() {
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
 
+  // Auto-insert slashes while typing: 03141990 → 03/14/1990 (and deletes cleanly).
+  const formatDob = (raw: string) => {
+    const d = raw.replace(/\D/g, '').slice(0, 8);
+    if (d.length <= 2) return d;
+    if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+    return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+  };
+
   const parseDob = (): Date | null => {
     const m = dob.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (!m) return null;
@@ -102,8 +110,8 @@ export default function SignUp() {
         <Field
           label="Date of birth"
           value={dob}
-          onChangeText={setDob}
-          keyboardType="numbers-and-punctuation"
+          onChangeText={(t) => setDob(formatDob(t))}
+          keyboardType="number-pad"
           placeholder="MM/DD/YYYY"
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -113,10 +121,6 @@ export default function SignUp() {
           variant="quiet"
           onPress={() => router.replace('/onboarding/signin')}
         />
-        <Text style={styles.note}>
-          Accounts are live (Supabase). Google and Apple sign-in ship together in a
-          later build.
-        </Text>
       </View>
     </Screen>
   );

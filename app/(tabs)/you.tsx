@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Avatar, Button, Chip, Hairline, VerifiedBadge } from '../../src/components/ui';
 import { reasonLabel } from '../../src/domain/vocab';
+import { chooseProfilePhoto } from '../../src/lib/photoPicker';
 import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
@@ -11,6 +12,12 @@ export default function You() {
   const router = useRouter();
   const me = useStore((s) => s.me);
   const deleteAccount = useStore((s) => s.deleteAccount);
+  const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
+
+  const changePhoto = async () => {
+    const picked = await chooseProfilePhoto();
+    if (picked) await setAvatarFromBase64(picked);
+  };
   const signOut = useStore((s) => s.signOut);
 
   if (!me) return null;
@@ -37,7 +44,9 @@ export default function You() {
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(2) }}>
         <View style={styles.head}>
-          <Avatar url={me.avatarUrl} fallback={me.photo} size={56} />
+          <Pressable onPress={() => void changePhoto()} accessibilityRole="button" accessibilityLabel="Change profile photo">
+            <Avatar url={me.avatarUrl} fallback={me.photo} size={56} />
+          </Pressable>
           <View style={{ flex: 1, gap: 3 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
               <Text style={styles.name}>{me.displayName}</Text>
@@ -62,10 +71,6 @@ export default function You() {
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.section}>SAFETY</Text>
           <Button label="Safety center" variant="ink" onPress={() => router.push('/safety')} />
-          <Text style={styles.note}>
-            Blocking, reporting, the no-solicitation policy, and how meetup PIN
-            verification works.
-          </Text>
         </View>
 
         <Hairline />
@@ -73,10 +78,6 @@ export default function You() {
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.section}>OPERATOR (NOT IN SHIPPING BUILD)</Text>
           <Button label="Density & review queue" variant="quiet" onPress={() => router.push('/density')} />
-          <Text style={styles.note}>
-            Match density by mode/route and the report review queue — the admin view
-            from PRD §5.3/§5.7, surfaced here only for the demo.
-          </Text>
         </View>
 
         <Hairline />
@@ -91,10 +92,6 @@ export default function You() {
             }}
           />
           <Button label="Delete account" variant="destructive" onPress={confirmDelete} />
-          <Text style={styles.note}>
-            Deletion is immediate and permanent. Production also exposes a web deletion
-            link for users who’ve uninstalled the app (Play policy).
-          </Text>
         </View>
       </View>
     </Screen>

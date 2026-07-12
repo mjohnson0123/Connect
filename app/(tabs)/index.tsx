@@ -67,10 +67,6 @@ export default function Board() {
               />
             );
           })}
-          <Text style={styles.privacyNote}>
-            Discovery shows shared route and time window only — never anyone’s position.
-            People appear here only while they’ve actively checked in.
-          </Text>
         </View>
       )}
     </Screen>

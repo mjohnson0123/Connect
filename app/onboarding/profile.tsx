@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Avatar, Button, Chip, Field } from '../../src/components/ui';
-import { pickProfilePhoto } from '../../src/lib/photoPicker';
+import { chooseProfilePhoto } from '../../src/lib/photoPicker';
 import { ReasonTag } from '../../src/domain/types';
 import { LIMITS, REASON_TAGS } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
@@ -21,7 +21,7 @@ export default function ProfileSetup() {
   const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
 
   const changePhoto = async () => {
-    const picked = await pickProfilePhoto();
+    const picked = await chooseProfilePhoto();
     if (!picked) return;
     setBusy(true);
     const err = await setAvatarFromBase64(picked);
@@ -83,7 +83,9 @@ export default function ProfileSetup() {
     <Screen>
       <View style={{ gap: space(5), paddingTop: space(4) }}>
         <View style={styles.photoRow}>
-          <Avatar url={me?.avatarUrl} fallback={me?.photo ?? '·'} size={56} />
+          <Pressable onPress={() => void changePhoto()} accessibilityRole="button" accessibilityLabel="Change profile photo">
+            <Avatar url={me?.avatarUrl} fallback={me?.photo ?? '·'} size={56} />
+          </Pressable>
           <Button label="Change photo" variant="quiet" onPress={() => void changePhoto()} />
         </View>
         <Field label="Display name" value={displayName} onChangeText={setDisplayName} placeholder="Alex Rivera" />
@@ -121,10 +123,6 @@ export default function ProfileSetup() {
               />
             ))}
           </View>
-          <Text style={styles.note}>
-            Reasons are fixed choices on purpose — it keeps the platform pitch-free.
-            There’s nowhere on a profile for phone numbers, emails, or social handles.
-          </Text>
         </View>
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button label={busy ? 'Saving…' : editing ? 'Save changes' : 'Finish profile'} onPress={submit} disabled={busy} />

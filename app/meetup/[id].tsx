@@ -157,10 +157,6 @@ export default function Meetup() {
           </View>
         )}
 
-        <Text style={styles.note}>
-          PIN verification reduces impersonation risk — it can’t guarantee the safety of
-          any in-person meeting. Meet in public places and trust your judgment.
-        </Text>
       </View>
     </Screen>
   );
