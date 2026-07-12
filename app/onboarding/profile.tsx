@@ -5,7 +5,7 @@ import Screen from '../../src/components/Screen';
 import { Avatar, Button, Chip, Field } from '../../src/components/ui';
 import { chooseProfilePhoto } from '../../src/lib/photoPicker';
 import { ReasonTag } from '../../src/domain/types';
-import { LIMITS, REASON_TAGS } from '../../src/domain/vocab';
+import { INDUSTRIES, LIMITS, MAX_INDUSTRIES, REASON_TAGS } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
@@ -32,7 +32,7 @@ export default function ProfileSetup() {
   const [displayName, setDisplayName] = useState(me?.displayName ?? '');
   const [headline, setHeadline] = useState(me?.headline ?? '');
   const [bio, setBio] = useState(me?.bio ?? '');
-  const [industry, setIndustry] = useState((me?.industryTags ?? []).join(', '));
+  const [industries, setIndustries] = useState<string[]>(me?.industryTags ?? []);
   const [reasons, setReasons] = useState<ReasonTag[]>(me?.reasonTags ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,6 +42,15 @@ export default function ProfileSetup() {
   const toggleReason = (tag: ReasonTag) =>
     setReasons((r) => (r.includes(tag) ? r.filter((t) => t !== tag) : [...r, tag]));
 
+  const toggleIndustry = (field: string) =>
+    setIndustries((cur) =>
+      cur.includes(field)
+        ? cur.filter((f) => f !== field)
+        : cur.length >= MAX_INDUSTRIES
+          ? cur
+          : [...cur, field],
+    );
+
   const submit = async () => {
     if (!displayName.trim() || !headline.trim()) {
       setError('Display name and headline are required.');
@@ -49,6 +58,10 @@ export default function ProfileSetup() {
     }
     if (reasons.length === 0) {
       setError('Pick at least one connection reason.');
+      return;
+    }
+    if (industries.length === 0) {
+      setError('Pick at least one industry or field — it’s how people find you.');
       return;
     }
     const initials = displayName
@@ -63,11 +76,7 @@ export default function ProfileSetup() {
       monogram: initials || '·',
       headline: headline.trim(),
       bio: bio.trim(),
-      industryTags: industry
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 3),
+      industryTags: industries,
       reasonTags: reasons,
     });
     setBusy(false);
@@ -105,12 +114,14 @@ export default function ProfileSetup() {
             style={{ minHeight: 88 }}
           />
         </View>
-        <Field
-          label="Industry tags (comma-separated, up to 3)"
-          value={industry}
-          onChangeText={setIndustry}
-          placeholder="Transit, Public sector"
-        />
+        <View style={{ gap: space(2.5) }}>
+          <Text style={styles.label}>INDUSTRIES & FIELDS · {industries.length}/{MAX_INDUSTRIES}</Text>
+          <View style={styles.chips}>
+            {INDUSTRIES.map((f) => (
+              <Chip key={f} label={f} selected={industries.includes(f)} onPress={() => toggleIndustry(f)} />
+            ))}
+          </View>
+        </View>
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.label}>WHY YOU’RE HERE</Text>
           <View style={styles.chips}>

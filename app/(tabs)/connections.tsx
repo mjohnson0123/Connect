@@ -1,30 +1,36 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import BoardRow from '../../src/components/BoardRow';
 import Screen from '../../src/components/Screen';
-import { Avatar, Button, VerifiedBadge } from '../../src/components/ui';
+import { Avatar, Button, Chip, VerifiedBadge } from '../../src/components/ui';
 import { reasonLabel } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * Double opt-in hub (PRD §5.4): no thread exists until the recipient accepts
- * (enforced by respond_request server-side). Accepting fires split-flap
- * moment #2 via the match modal.
+ * Connect hub. Two ways to find people, both double-opt-in (PRD §5.4) and
+ * both anonymized until accept:
+ *  - DISCOVER: people who share an industry/field with you (discover_people).
+ *  - Incoming requests, your connections, and sent requests.
+ * Names are first-name-only everywhere here; the full name is revealed only
+ * once a request is accepted and the pair becomes a connection.
  */
 export default function Connections() {
   const router = useRouter();
   const requestsIn = useStore((s) => s.requestsIn);
   const requestsOut = useStore((s) => s.requestsOut);
   const connections = useStore((s) => s.connections);
+  const discoverPeople = useStore((s) => s.discoverPeople);
   const respondRequest = useStore((s) => s.respondRequest);
   const refresh = useStore((s) => s.refresh);
+  const loadDiscover = useStore((s) => s.loadDiscover);
 
   useFocusEffect(
     useCallback(() => {
       void refresh();
-    }, [refresh]),
+      void loadDiscover();
+    }, [refresh, loadDiscover]),
   );
 
   const accept = async (id: string, name: string) => {
@@ -39,6 +45,49 @@ export default function Connections() {
   return (
     <Screen>
       <View style={{ gap: space(6), paddingTop: space(2) }}>
+        {/* DISCOVER — interest-based, anonymized cards, horizontal browse */}
+        <View style={{ gap: space(2.5) }}>
+          <Text style={styles.section}>DISCOVER · SHARED FIELDS</Text>
+          {discoverPeople.length === 0 ? (
+            <Text style={styles.emptyLine}>
+              No matches yet. Add industries to your profile so people in your field can
+              find you — and you them.
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: space(3), paddingRight: space(4) }}
+            >
+              {discoverPeople.map((p) => (
+                <View key={p.id} style={styles.discoverCard}>
+                  <View style={{ alignItems: 'center', gap: space(2) }}>
+                    <Avatar url={p.avatarUrl} fallback={p.monogram} size={64} />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(1.5) }}>
+                      <Text style={styles.discoverName}>{p.displayName}</Text>
+                      {p.verificationStatus === 'verified' ? <VerifiedBadge compact /> : null}
+                    </View>
+                    <Text style={styles.discoverHeadline} numberOfLines={2}>
+                      {p.headline}
+                    </Text>
+                  </View>
+                  <View style={styles.discoverChips}>
+                    {p.industryTags.slice(0, 2).map((t) => (
+                      <Chip key={t} label={t} />
+                    ))}
+                  </View>
+                  <Button
+                    label="Request to connect"
+                    onPress={() =>
+                      router.push({ pathname: '/request/[userId]', params: { userId: p.id, name: p.displayName } })
+                    }
+                  />
+                </View>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.section}>REQUESTS FOR YOU</Text>
           {requestsIn.length === 0 ? (
@@ -105,6 +154,18 @@ export default function Connections() {
 const styles = StyleSheet.create({
   section: { ...type.monoSmall, color: color.textMutedOnChalk },
   emptyLine: { ...type.caption, color: color.textMutedOnChalk },
+  discoverCard: {
+    width: 220,
+    backgroundColor: color.chalkRaised,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: color.hairline,
+    padding: space(4),
+    gap: space(3),
+  },
+  discoverName: { ...type.headline, color: color.textOnChalk },
+  discoverHeadline: { ...type.caption, color: color.textMutedOnChalk, textAlign: 'center', minHeight: 34 },
+  discoverChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), justifyContent: 'center', minHeight: 30 },
   requestCard: {
     backgroundColor: color.chalkRaised,
     borderRadius: radius.card,

@@ -22,6 +22,7 @@ export interface BoardEntry {
 
 export interface PersonCard {
   id: string;
+  /** Anonymized (first name only) until a connection is accepted. */
   displayName: string;
   monogram: string;
   avatarUrl: string | null;
@@ -30,6 +31,8 @@ export interface PersonCard {
   industryTags: string[];
   reasonTags: ReasonTag[];
   verificationStatus: string;
+  /** Discovery only: how many industry tags overlap with me. */
+  sharedTags?: number;
 }
 
 export interface RequestRow {
@@ -74,6 +77,7 @@ interface AppState {
   patterns: TripPattern[];
   board: BoardEntry[];
   people: Record<string, PersonCard[]>;
+  discoverPeople: PersonCard[];
   requestsIn: RequestRow[];
   requestsOut: RequestRow[];
   connections: ConnectionRow[];
@@ -109,6 +113,7 @@ interface AppState {
   checkIn: (patternId: string) => Promise<string | null>;
   endCheckIn: (patternId: string) => Promise<void>;
   loadPeople: (patternId: string) => Promise<void>;
+  loadDiscover: (query?: string) => Promise<void>;
 
   sendRequest: (toUserId: string, reason: ReasonTag, intro: string) => Promise<string | null>;
   respondRequest: (id: string, accept: boolean) => Promise<string | null>;
@@ -170,6 +175,12 @@ function mapPattern(row: Record<string, unknown>): TripPattern {
   };
 }
 
+/** First name only — the anonymized display until a connection is accepted. */
+function firstName(full?: string | null): string {
+  const f = (full ?? '').trim().split(/\s+/)[0];
+  return f || 'Member';
+}
+
 function friendlyError(message: string): string {
   if (/invalid login credentials/i.test(message)) return 'That email and password don’t match.';
   if (/email not confirmed/i.test(message)) return 'Confirm your email first — check your inbox for the link.';
@@ -190,6 +201,7 @@ export const useStore = create<AppState>()(
       patterns: [],
       board: [],
       people: {},
+      discoverPeople: [],
       requestsIn: [],
       requestsOut: [],
       connections: [],
@@ -205,7 +217,7 @@ export const useStore = create<AppState>()(
           const next = session?.user.id ?? null;
           if (prev !== next) {
             set({
-              myId: next, me: null, patterns: [], board: [], people: {},
+              myId: next, me: null, patterns: [], board: [], people: {}, discoverPeople: [],
               requestsIn: [], requestsOut: [], connections: [], messages: {}, blocked: [],
             });
             // Deferred: supabase-js holds an internal auth lock during this
@@ -270,7 +282,8 @@ export const useStore = create<AppState>()(
           reasonTag: r.reason_tag,
           introText: r.intro_text,
           createdAt: new Date(r.created_at).getTime(),
-          otherName: other?.display_name ?? 'Member',
+          // Pending requests stay anonymized until accepted — first name only.
+          otherName: firstName(other?.display_name),
           otherMonogram: other?.monogram ?? '·',
           otherAvatarUrl: other?.avatar_url ?? null,
           otherHeadline: other?.headline ?? '',
@@ -485,6 +498,26 @@ export const useStore = create<AppState>()(
               verificationStatus: r.verification_status,
             })),
           },
+        });
+      },
+
+      loadDiscover: async (query = '') => {
+        // Interest-based discovery: people who share an industry/field, shown
+        // anonymized (first name) until a request is accepted.
+        const { data } = await supabase.rpc('discover_people', { p_query: query });
+        set({
+          discoverPeople: ((data ?? []) as Record<string, any>[]).map((r) => ({
+            id: r.id,
+            displayName: r.first_name,
+            monogram: r.monogram,
+            avatarUrl: r.avatar_url ?? null,
+            headline: r.headline,
+            bio: r.bio,
+            industryTags: r.industry_tags ?? [],
+            reasonTags: r.reason_tags ?? [],
+            verificationStatus: r.verification_status,
+            sharedTags: r.shared_tags ?? 0,
+          })),
         });
       },
 

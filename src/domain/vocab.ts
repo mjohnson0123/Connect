@@ -28,6 +28,55 @@ export const MODES: { value: TravelMode; label: string; code: string }[] = [
 export const modeCode = (mode: TravelMode) =>
   MODES.find((m) => m.value === mode)?.code ?? mode.toUpperCase().slice(0, 3);
 
+/**
+ * Industry / field controlled vocabulary. A fixed list (not free text) is what
+ * makes interest-based discovery actually work: two people only match on a
+ * field if they pick the exact same label. Keep these stable once shipped —
+ * they're matching keys, not just display strings.
+ */
+export const INDUSTRIES: string[] = [
+  'Software Engineering',
+  'Data & AI',
+  'Product Management',
+  'Design & UX',
+  'Technology (other)',
+  'Finance',
+  'Banking & Investment',
+  'Accounting',
+  'Consulting',
+  'Legal',
+  'Healthcare',
+  'Biotech & Pharma',
+  'Government & Policy',
+  'Nonprofit',
+  'Education',
+  'Academia & Research',
+  'Marketing',
+  'Sales',
+  'Media & Journalism',
+  'Entertainment',
+  'Arts & Culture',
+  'Real Estate',
+  'Architecture',
+  'Engineering (non-software)',
+  'Manufacturing',
+  'Energy',
+  'Transportation & Logistics',
+  'Retail & E-commerce',
+  'Hospitality',
+  'Human Resources',
+  'Operations',
+  'Entrepreneurship',
+  'Aerospace & Defense',
+  'Construction',
+  'Insurance',
+  'Telecommunications',
+  'Sports',
+];
+
+/** Max industries a profile can select — keeps matching meaningful, not noisy. */
+export const MAX_INDUSTRIES = 5;
+
 export const REPORT_CATEGORIES: {
   value: ReportCategory;
   label: string;
