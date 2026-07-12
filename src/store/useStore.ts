@@ -175,10 +175,11 @@ function mapPattern(row: Record<string, unknown>): TripPattern {
   };
 }
 
-/** First name only — the anonymized display until a connection is accepted. */
-function firstName(full?: string | null): string {
-  const f = (full ?? '').trim().split(/\s+/)[0];
-  return f || 'Member';
+/** Initials only (e.g. "D.O.") — the anonymized identity shown until a
+ *  connection is accepted. The full name is revealed only on accept. */
+function initials(monogram?: string | null): string {
+  const chars = (monogram ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 2);
+  return chars ? chars.split('').join('.') + '.' : '•';
 }
 
 function friendlyError(message: string): string {
@@ -282,8 +283,8 @@ export const useStore = create<AppState>()(
           reasonTag: r.reason_tag,
           introText: r.intro_text,
           createdAt: new Date(r.created_at).getTime(),
-          // Pending requests stay anonymized until accepted — first name only.
-          otherName: firstName(other?.display_name),
+          // Pending requests stay anonymized until accepted — initials only.
+          otherName: initials(other?.monogram),
           otherMonogram: other?.monogram ?? '·',
           otherAvatarUrl: other?.avatar_url ?? null,
           otherHeadline: other?.headline ?? '',
@@ -488,7 +489,7 @@ export const useStore = create<AppState>()(
             ...get().people,
             [patternId]: ((data ?? []) as Record<string, any>[]).map((r) => ({
               id: r.id,
-              displayName: r.display_name,
+              displayName: initials(r.monogram), // anonymized until connected
               monogram: r.monogram,
               avatarUrl: r.avatar_url ?? null,
               headline: r.headline,
@@ -508,7 +509,7 @@ export const useStore = create<AppState>()(
         set({
           discoverPeople: ((data ?? []) as Record<string, any>[]).map((r) => ({
             id: r.id,
-            displayName: r.first_name,
+            displayName: initials(r.monogram), // anonymized until connected
             monogram: r.monogram,
             avatarUrl: r.avatar_url ?? null,
             headline: r.headline,

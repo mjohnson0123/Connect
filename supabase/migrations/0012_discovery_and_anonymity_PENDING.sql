@@ -4,18 +4,18 @@
 -- Product change: people are now discoverable two ways —
 --   (1) shared route + active check-in (existing), and
 --   (2) shared industry/field (new discover_people), surfaced in Connect.
--- In both, the real NAME is hidden until a request is mutually accepted;
--- the photo and profile are shown so people can decide. Once accepted, the
--- connection reveals the full name (the connections join already does this
--- under RLS). First-name-only is the anonymization here — adjust to initials
--- by swapping split_part(...) for a monogram if you want more anonymity.
+-- In both, the real NAME never leaves the DB until a request is mutually
+-- accepted; only the monogram (initials), photo, and profile are returned so
+-- people can decide. Once accepted, the connections join reveals the full
+-- name under RLS. Anonymization here is initials-only — the real display_name
+-- is never selected by these functions.
 
--- Anonymize route discovery: return first name only, keep column shape.
+-- Route discovery: return monogram in place of the name (no real-name leak).
 create or replace function public.route_people(p_pattern_id uuid)
 returns table (id uuid, display_name text, monogram text, headline text, bio text,
                industry_tags text[], reason_tags text[], verification_status text, avatar_url text)
 language sql stable security definer set search_path = public, pg_temp as $$
-  select distinct pr.id, split_part(pr.display_name, ' ', 1) as display_name, pr.monogram,
+  select distinct pr.id, pr.monogram as display_name, pr.monogram,
          pr.headline, pr.bio, pr.industry_tags, pr.reason_tags, pr.verification_status, pr.avatar_url
   from public.trip_patterns mine
   join public.check_ins c on c.rkey = mine.rkey and c.active_until > now() and c.user_id <> auth.uid()
@@ -26,14 +26,15 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 -- Interest-based discovery: people who share ≥1 industry tag with me,
--- anonymized, excluding self / connected / pending / blocked / restricted.
+-- anonymized (monogram only), excluding self / connected / pending / blocked.
+drop function if exists public.discover_people(text);
 create or replace function public.discover_people(p_query text default '')
-returns table (id uuid, first_name text, monogram text, headline text, bio text,
+returns table (id uuid, monogram text, headline text, bio text,
                industry_tags text[], reason_tags text[], verification_status text,
                avatar_url text, shared_tags int)
 language sql stable security definer set search_path = public, pg_temp as $$
   with me as (select industry_tags from public.profiles where id = auth.uid())
-  select pr.id, split_part(pr.display_name, ' ', 1) as first_name, pr.monogram,
+  select pr.id, pr.monogram,
          pr.headline, pr.bio, pr.industry_tags, pr.reason_tags, pr.verification_status, pr.avatar_url,
          cardinality(array(
            select unnest(pr.industry_tags) intersect select unnest(me.industry_tags)

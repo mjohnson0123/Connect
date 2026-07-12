@@ -33,10 +33,13 @@ export default function Connections() {
     }, [refresh, loadDiscover]),
   );
 
-  const accept = async (id: string, name: string) => {
+  const accept = async (id: string) => {
     const connId = await respondRequest(id, true);
     if (connId) {
-      router.push({ pathname: '/match', params: { connectionId: connId, name } });
+      // respondRequest refreshed state; the connection now carries the FULL
+      // name — the match modal is where the reveal lands.
+      const conn = useStore.getState().connections.find((c) => c.id === connId);
+      router.push({ pathname: '/match', params: { connectionId: connId, name: conn?.otherName ?? '' } });
     }
   };
 
@@ -108,7 +111,7 @@ export default function Connections() {
                 <Text style={styles.reason}>{reasonLabel(r.reasonTag).toUpperCase()}</Text>
                 {r.introText ? <Text style={styles.intro}>“{r.introText}”</Text> : null}
                 <View style={{ flexDirection: 'row', gap: space(2.5) }}>
-                  <Button label="Accept" onPress={() => void accept(r.id, r.otherName)} style={{ flex: 1 }} />
+                  <Button label="Accept" onPress={() => void accept(r.id)} style={{ flex: 1 }} />
                   <Button label="Decline" variant="quiet" onPress={() => void respondRequest(r.id, false)} style={{ flex: 1 }} />
                 </View>
               </View>
