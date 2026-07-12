@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "esbuild": "^0.28.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -37,7 +38,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "esbuild scripts/logic.test.ts --bundle --platform=node --format=cjs --outfile=logic.test.cjs && node --test logic.test.cjs && rm -f logic.test.cjs"
   },
   "private": true
 }
