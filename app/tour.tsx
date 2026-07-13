@@ -32,7 +32,7 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
     glyph: '⇌',
     eyebrow: 'CHECK IN',
     title: 'Visible only when you say so',
-    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. Never your location. Never always-on. Just the shared route.',
+    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. Never your location, never always-on. Set a reminder and the app nudges you before your window opens.',
   },
   {
     glyph: '◇',
@@ -59,6 +59,7 @@ export default function Tour() {
   const insets = useSafeAreaInsets();
   const setTourSeen = useStore((s) => s.setTourSeen);
   const [page, setPage] = useState(0);
+  const [listHeight, setListHeight] = useState(0);
   const scrollRef = useRef<Animated.FlatList<(typeof SLIDES)[number]>>(null);
   const width = Dimensions.get('window').width;
 
@@ -95,6 +96,7 @@ export default function Tour() {
         </Pressable>
       </View>
 
+      <View style={{ flex: 1 }} onLayout={(e) => setListHeight(e.nativeEvent.layout.height)}>
       <Animated.FlatList
         ref={scrollRef}
         data={SLIDES}
@@ -104,7 +106,7 @@ export default function Tour() {
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={onScroll}
         renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
+          <View style={[styles.slide, { width, height: listHeight || undefined }]}>
             <View style={styles.glyphTile}>
               <Text style={styles.glyph}>{item.glyph}</Text>
             </View>
@@ -114,6 +116,7 @@ export default function Tour() {
           </View>
         )}
       />
+      </View>
 
       <View style={styles.footer}>
         <View style={styles.dots} accessibilityLabel={`Slide ${page + 1} of ${SLIDES.length}`}>
@@ -139,7 +142,8 @@ const styles = StyleSheet.create({
   skip: { fontFamily: font.mono, fontSize: 12, letterSpacing: 1, color: color.amberOnInk, padding: space(2) },
   slide: {
     paddingHorizontal: space(6),
-    paddingTop: space(14),
+    justifyContent: 'center',
+    paddingBottom: space(12), // optical center: sit slightly above true middle
     gap: space(4),
   },
   glyphTile: {
