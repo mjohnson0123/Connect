@@ -85,6 +85,7 @@ export default function You() {
 
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.section}>ACCOUNT</Text>
+          <Button label="Change password" variant="quiet" onPress={() => router.push('/change-password')} />
           <Button
             label="Sign out"
             variant="quiet"

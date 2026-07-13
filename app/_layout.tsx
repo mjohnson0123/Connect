@@ -86,6 +86,7 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding/profile" options={{ title: 'Your profile' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="tour" options={{ headerShown: false }} />
+        <Stack.Screen name="change-password" options={{ presentation: 'modal', title: 'Change password' }} />
         <Stack.Screen name="pattern/[id]" options={{ title: 'On this route' }} />
         <Stack.Screen name="request/[userId]" options={{ presentation: 'modal', title: 'Request to connect' }} />
         <Stack.Screen name="match" options={{ presentation: 'modal', headerShown: false }} />

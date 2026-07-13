@@ -98,6 +98,8 @@ interface AppState {
   deleteAccount: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<string | null>;
   confirmPasswordReset: (email: string, code: string, newPassword: string) => Promise<string | null>;
+  /** Signed-in password change (session authorizes it; no email code needed). */
+  changePassword: (newPassword: string) => Promise<string | null>;
   /** Uploads the selfie to private storage and records the verification. */
   submitVerification: (imageBase64: string | null) => Promise<string | null>;
   /** Opt-in: publish the verified selfie as the profile photo. */
@@ -376,6 +378,12 @@ export const useStore = create<AppState>()(
         if (updateError) return friendlyError(updateError.message);
         await get().refresh();
         return null;
+      },
+
+      changePassword: async (newPassword) => {
+        if (newPassword.length < 8) return 'Password needs at least 8 characters.';
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        return error ? friendlyError(error.message) : null;
       },
 
       submitVerification: async (imageBase64) => {
