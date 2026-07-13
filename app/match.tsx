@@ -16,8 +16,9 @@ export default function Match() {
         <SplitFlap text="CONNECTED" cellSize={32} />
         <Text style={styles.name}>{name}</Text>
         <Text style={styles.body}>
-          You’re both in. A private, in-app conversation is open — it stays text-only,
-          and it expires 30 days after the last message unless you keep it going.
+          You’re both in — and this is the first time either of you sees a full name.
+          A private, in-app conversation is open: text-only, and it expires 30 days
+          after the last message unless you keep it going.
         </Text>
       </View>
       <View style={{ gap: space(3), width: '100%' }}>

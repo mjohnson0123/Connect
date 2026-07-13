@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import SplitFlap from '../../src/components/SplitFlap';
 import { Button, Field } from '../../src/components/ui';
@@ -119,6 +119,16 @@ export default function Meetup() {
           <View style={{ gap: space(3) }}>
             <Button label={busy ? 'Generating…' : 'Show a code'} onPress={() => void showCode()} disabled={busy} />
             <Button label="Enter their code" variant="ink" onPress={() => setMode('enter')} />
+            <Pressable
+              onPress={() => router.push('/safety')}
+              accessibilityRole="link"
+              accessibilityLabel="Open the safety center"
+              style={{ alignSelf: 'center', padding: space(2) }}
+            >
+              <Text style={styles.meetTip}>
+                Meet somewhere public. <Text style={styles.meetTipLink}>Safety center →</Text>
+              </Text>
+            </Pressable>
           </View>
         ) : mode === 'show' ? (
           <View style={{ gap: space(4), alignItems: 'center' }}>
@@ -177,7 +187,9 @@ const styles = StyleSheet.create({
   countdown: { ...type.mono, color: color.amberTextOnChalk },
   error: { ...type.caption, color: color.caution },
   note: { ...type.caption, color: color.textMutedOnChalk },
-  pinInput: { fontFamily: 'IBMPlexMono_500Medium', fontSize: 24, letterSpacing: 8, textAlign: 'center' },
+  meetTip: { ...type.caption, color: color.textMutedOnChalk, textAlign: 'center' },
+  meetTipLink: { ...type.caption, color: color.amberTextOnChalk },
+  pinInput:{ fontFamily: 'IBMPlexMono_500Medium', fontSize: 24, letterSpacing: 8, textAlign: 'center' },
   verifiedBox: {
     backgroundColor: color.signalTintBg,
     borderWidth: 1,

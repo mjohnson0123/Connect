@@ -128,10 +128,19 @@ export default function Chat() {
         contentContainerStyle={{ padding: space(4), gap: space(2) }}
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListHeaderComponent={
-          <Text style={styles.expiryNote}>
-            Text-only and in-app. This thread auto-expires {LIMITS.chatExpiryDays} days
-            after the last message. Meeting up? Verify each other with a PIN first.
-          </Text>
+          <View style={styles.threadNote}>
+            <Text style={styles.expiryNote}>
+              Text-only and in-app. This thread auto-expires {LIMITS.chatExpiryDays} days
+              after the last message. Meeting up? Verify each other with a PIN first.
+            </Text>
+            <Pressable
+              onPress={() => router.push('/safety')}
+              accessibilityRole="link"
+              accessibilityLabel="Open the safety center"
+            >
+              <Text style={styles.safetyLink}>HOW WE KEEP THIS SAFE →</Text>
+            </Pressable>
+          </View>
         }
         renderItem={({ item }) => {
           const mine = item.senderId === myId;
@@ -171,7 +180,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.chalk },
   gone: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.chalk },
   headerAction: { fontFamily: font.mono, fontSize: 12, letterSpacing: 0.6, color: color.ink },
-  expiryNote: { ...type.caption, color: color.textMutedOnChalk, marginBottom: space(3), textAlign: 'center' },
+  threadNote: { marginBottom: space(3), gap: space(2), alignItems: 'center' },
+  expiryNote: { ...type.caption, color: color.textMutedOnChalk, textAlign: 'center' },
+  safetyLink: { ...type.monoSmall, color: color.amberTextOnChalk, padding: space(1) },
   bubble: {
     maxWidth: '82%',
     borderRadius: radius.card,
