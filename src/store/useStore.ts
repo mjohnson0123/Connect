@@ -85,6 +85,9 @@ interface AppState {
   blocked: { id: string; displayName: string }[];
   /** patternId → scheduled local-notification ids (device-local, persisted). */
   reminders: Record<string, string[]>;
+  /** First-run feature tour shown once per install; re-openable from You tab. */
+  tourSeen: boolean;
+  setTourSeen: () => void;
 
   boot: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -209,6 +212,7 @@ export const useStore = create<AppState>()(
       messages: {},
       blocked: [],
       reminders: {},
+      tourSeen: false,
 
       boot: async () => {
         const { data } = await supabase.auth.getSession();
@@ -658,6 +662,8 @@ export const useStore = create<AppState>()(
         };
       },
 
+      setTourSeen: () => set({ tourSeen: true }),
+
       setReminder: (patternId, notificationIds) => {
         const current = get().reminders;
         if (notificationIds === null) {
@@ -672,7 +678,7 @@ export const useStore = create<AppState>()(
       name: 'commuter-connect-local-v1',
       storage: createJSONStorage(() => AsyncStorage),
       // Only device-local concerns persist here; Supabase owns all shared data.
-      partialize: (s) => ({ reminders: s.reminders }) as AppState,
+      partialize: (s) => ({ reminders: s.reminders, tourSeen: s.tourSeen }) as AppState,
     },
   ),
 );

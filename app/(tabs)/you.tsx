@@ -65,6 +65,7 @@ export default function You() {
         </View>
 
         <Button label="Edit profile" variant="quiet" onPress={() => router.push('/onboarding/profile')} />
+        <Button label="How Commuter Connect works" variant="quiet" onPress={() => router.push('/tour')} />
 
         <Hairline />
 

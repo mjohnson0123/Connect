@@ -11,6 +11,7 @@ export default function Index() {
   const me = useStore((s) => s.me);
   const refreshError = useStore((s) => s.refreshError);
   const refresh = useStore((s) => s.refresh);
+  const tourSeen = useStore((s) => s.tourSeen);
 
   if (!myId) return <Redirect href="/onboarding/welcome" />;
   if (!me) {
@@ -34,5 +35,6 @@ export default function Index() {
   }
   if (me.verificationStatus !== 'verified') return <Redirect href="/onboarding/verify" />;
   if (!me.displayName) return <Redirect href="/onboarding/profile" />;
+  if (!tourSeen) return <Redirect href="/tour" />;
   return <Redirect href="/(tabs)" />;
 }
