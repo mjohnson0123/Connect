@@ -2,7 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
-import { Avatar, Button, Chip, VerifiedBadge } from '../../src/components/ui';
+import { Button, Chip, Monogram, VerifiedBadge } from '../../src/components/ui';
 import { modeCode, reasonLabel } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
@@ -62,7 +62,7 @@ export default function PatternPeople() {
           cards.map((u) => (
             <View key={u.id} style={styles.card}>
               <View style={styles.cardHead}>
-                <Avatar url={u.avatarUrl} fallback={u.monogram} />
+                <Monogram text={u.monogram} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
                     <Text style={styles.name}>{u.displayName}</Text>

@@ -1,9 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import BoardRow from '../../src/components/BoardRow';
 import Screen from '../../src/components/Screen';
-import { Avatar, Button, Chip, VerifiedBadge } from '../../src/components/ui';
+import { Avatar, Button, Chip, Field, Monogram, VerifiedBadge } from '../../src/components/ui';
 import { reasonLabel } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
@@ -13,8 +13,9 @@ import { color, radius, space, type } from '../../src/theme/tokens';
  * both anonymized until accept:
  *  - DISCOVER: people who share an industry/field with you (discover_people).
  *  - Incoming requests, your connections, and sent requests.
- * Names are first-name-only everywhere here; the full name is revealed only
- * once a request is accepted and the pair becomes a connection.
+ * Identity is initials-only (no name, no photo) in discovery/search; the
+ * full name is revealed once a request is accepted. Incoming requests keep
+ * the sender's photo — the recipient deciding deserves the most information.
  */
 export default function Connections() {
   const router = useRouter();
@@ -26,12 +27,22 @@ export default function Connections() {
   const refresh = useStore((s) => s.refresh);
   const loadDiscover = useStore((s) => s.loadDiscover);
 
+  const me = useStore((s) => s.me);
+  const [query, setQuery] = useState('');
+
   useFocusEffect(
     useCallback(() => {
       void refresh();
-      void loadDiscover();
+      void loadDiscover(query);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refresh, loadDiscover]),
   );
+
+  // Debounced interest search — the RPC filters by field/headline.
+  useEffect(() => {
+    const t = setTimeout(() => void loadDiscover(query), 350);
+    return () => clearTimeout(t);
+  }, [query, loadDiscover]);
 
   const accept = async (id: string) => {
     const connId = await respondRequest(id, true);
@@ -48,47 +59,57 @@ export default function Connections() {
   return (
     <Screen>
       <View style={{ gap: space(6), paddingTop: space(2) }}>
-        {/* DISCOVER — interest-based, anonymized cards, horizontal browse */}
+        {/* DISCOVER — search people by shared field. Initials only, no photo,
+            full profile info; identity reveals after mutual accept. */}
         <View style={{ gap: space(2.5) }}>
-          <Text style={styles.section}>DISCOVER · SHARED FIELDS</Text>
+          <Text style={styles.section}>FIND PEOPLE IN YOUR FIELDS</Text>
+          <Field
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by field or role — e.g. Finance, designer"
+            autoCapitalize="none"
+          />
           {discoverPeople.length === 0 ? (
             <Text style={styles.emptyLine}>
-              No matches yet. Add industries to your profile so people in your field can
-              find you — and you them.
+              {query
+                ? 'Nobody matches that yet — try a broader field.'
+                : 'Matches share at least one of your fields. Add more industries on your profile to widen this.'}
             </Text>
           ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: space(3), paddingRight: space(4) }}
-            >
-              {discoverPeople.map((p) => (
-                <View key={p.id} style={styles.discoverCard}>
-                  <View style={{ alignItems: 'center', gap: space(2) }}>
-                    <Avatar url={p.avatarUrl} fallback={p.monogram} size={64} />
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(1.5) }}>
-                      <Text style={styles.discoverName}>{p.displayName}</Text>
+            discoverPeople.map((p) => (
+              <View key={p.id} style={styles.discoverCard}>
+                <View style={styles.requestHead}>
+                  <Monogram text={p.monogram} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
+                      <Text style={styles.name}>{p.displayName}</Text>
                       {p.verificationStatus === 'verified' ? <VerifiedBadge compact /> : null}
                     </View>
-                    <Text style={styles.discoverHeadline} numberOfLines={2}>
-                      {p.headline}
-                    </Text>
+                    <Text style={styles.headline}>{p.headline}</Text>
                   </View>
-                  <View style={styles.discoverChips}>
-                    {p.industryTags.slice(0, 2).map((t) => (
-                      <Chip key={t} label={t} />
-                    ))}
-                  </View>
-                  <Button
-                    label="Request to connect"
-                    onPress={() =>
-                      router.push({ pathname: '/request/[userId]', params: { userId: p.id, name: p.displayName } })
-                    }
-                  />
+                  <Text style={styles.shared}>
+                    {p.sharedTags ?? 0} SHARED{'\n'}{(p.sharedTags ?? 0) === 1 ? 'FIELD' : 'FIELDS'}
+                  </Text>
                 </View>
-              ))}
-            </ScrollView>
+                {p.bio ? <Text style={styles.bio}>{p.bio}</Text> : null}
+                <View style={styles.chipRow}>
+                  {p.industryTags.map((t) => (
+                    <Chip key={t} label={t} selected={(me?.industryTags ?? []).includes(t)} />
+                  ))}
+                </View>
+                <Button
+                  label="Request to connect"
+                  onPress={() =>
+                    router.push({ pathname: '/request/[userId]', params: { userId: p.id, name: p.displayName } })
+                  }
+                />
+              </View>
+            ))
           )}
+          <Text style={styles.anonNote}>
+            People appear by initials only until you’re connected — accept reveals names,
+            both ways.
+          </Text>
         </View>
 
         <View style={{ gap: space(2.5) }}>
@@ -158,7 +179,6 @@ const styles = StyleSheet.create({
   section: { ...type.monoSmall, color: color.textMutedOnChalk },
   emptyLine: { ...type.caption, color: color.textMutedOnChalk },
   discoverCard: {
-    width: 220,
     backgroundColor: color.chalkRaised,
     borderRadius: radius.card,
     borderWidth: 1,
@@ -166,9 +186,10 @@ const styles = StyleSheet.create({
     padding: space(4),
     gap: space(3),
   },
-  discoverName: { ...type.headline, color: color.textOnChalk },
-  discoverHeadline: { ...type.caption, color: color.textMutedOnChalk, textAlign: 'center', minHeight: 34 },
-  discoverChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5), justifyContent: 'center', minHeight: 30 },
+  shared: { ...type.monoSmall, color: color.amberTextOnChalk, textAlign: 'right' },
+  bio: { ...type.body, color: color.textOnChalk },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space(1.5) },
+  anonNote: { ...type.caption, color: color.textMutedOnChalk },
   requestCard: {
     backgroundColor: color.chalkRaised,
     borderRadius: radius.card,
