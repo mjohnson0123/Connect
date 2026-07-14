@@ -1,7 +1,8 @@
 import { useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import Screen from '../../src/components/Screen';
 import { Button } from '../../src/components/ui';
@@ -26,6 +27,7 @@ export default function Verify() {
   const finishLiveness = useStore((s) => s.finishLiveness);
   const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
   const [permission, requestPermission] = useCameraPermissions();
+  const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<'intro' | 'liveness' | 'checking' | 'photo' | 'done'>('intro');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +141,28 @@ export default function Verify() {
       .replace('__REGION__', process.env.EXPO_PUBLIC_AWS_REGION ?? 'us-east-1')
       .replace('__IDENTITY_POOL_ID__', process.env.EXPO_PUBLIC_AWS_IDENTITY_POOL_ID ?? '');
     return (
-      <View style={{ flex: 1, backgroundColor: color.ink }}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: color.ink,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
+      >
+        {/* Slim top bar (tour-style) instead of a footer button: the AWS
+            detector lays its own controls out at the bottom of the page, so
+            every vertical pixel below the bar belongs to it. */}
+        <View style={livenessStyles.topBar}>
+          <Text style={livenessStyles.topBarTitle}>FACE CHECK</Text>
+          <Pressable
+            onPress={() => setPhase('intro')}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel face check"
+            hitSlop={10}
+          >
+            <Text style={livenessStyles.topBarCancel}>CANCEL</Text>
+          </Pressable>
+        </View>
         <WebView
           source={{ html, baseUrl: 'https://localhost' }}
           originWhitelist={['*']}
@@ -151,9 +174,6 @@ export default function Verify() {
           onMessage={onWebViewMessage}
           style={{ flex: 1, backgroundColor: color.ink }}
         />
-        <View style={{ padding: space(4), backgroundColor: color.ink }}>
-          <Button label="Cancel" variant="quietOnInk" onPress={() => setPhase('intro')} />
-        </View>
       </View>
     );
   }
@@ -220,6 +240,18 @@ export default function Verify() {
     </Screen>
   );
 }
+
+const livenessStyles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: space(5),
+    paddingVertical: space(3),
+  },
+  topBarTitle: { ...type.monoSmall, color: color.textMutedOnInk },
+  topBarCancel: { ...type.monoSmall, fontSize: 12, color: color.amberOnInk },
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'center', paddingBottom: space(10) },

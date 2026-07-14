@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -91,15 +91,31 @@ export function Chip({
 }
 
 export function Field(props: TextInputProps & { label?: string }) {
-  const { label, style, ...rest } = props;
+  const { label, style, secureTextEntry, ...rest } = props;
+  // Password fields get a show/hide toggle; hidden by default.
+  const [revealed, setRevealed] = useState(false);
   return (
     <View style={{ gap: space(1.5) }}>
       {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
-      <TextInput
-        placeholderTextColor={color.textMutedOnChalk}
-        style={[styles.field, style]}
-        {...rest}
-      />
+      <View>
+        <TextInput
+          placeholderTextColor={color.textMutedOnChalk}
+          secureTextEntry={secureTextEntry && !revealed}
+          style={[styles.field, secureTextEntry && { paddingRight: space(14) }, style]}
+          {...rest}
+        />
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setRevealed((r) => !r)}
+            accessibilityRole="button"
+            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            hitSlop={10}
+            style={styles.fieldReveal}
+          >
+            <Text style={styles.fieldRevealLabel}>{revealed ? 'HIDE' : 'SHOW'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -220,6 +236,15 @@ const styles = StyleSheet.create({
     ...type.body,
     color: color.textOnChalk,
   },
+  fieldReveal: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    paddingHorizontal: space(3.5),
+  },
+  fieldRevealLabel: { ...type.monoSmall, color: color.amberTextOnChalk },
   hairline: { height: StyleSheet.hairlineWidth, backgroundColor: color.hairline },
   badge: {
     backgroundColor: color.signal,

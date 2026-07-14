@@ -85,7 +85,9 @@ export default function ProfileSetup() {
       return;
     }
     if (editing) router.back();
-    else router.replace('/(tabs)');
+    // New account: go through the index gate so the first-run tour fires
+    // before the tabs (routing straight to /(tabs) would skip it).
+    else router.replace('/');
   };
 
   return (

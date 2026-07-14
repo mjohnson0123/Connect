@@ -344,6 +344,9 @@ export const useStore = create<AppState>()(
         }
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) return friendlyError(error.message);
+        // tourSeen persists per-device, not per-account — a fresh account on a
+        // phone that saw the tour before must still get its first-run tour.
+        set({ tourSeen: false });
         if (!data.session) {
           return 'CONFIRM_EMAIL';
         }
