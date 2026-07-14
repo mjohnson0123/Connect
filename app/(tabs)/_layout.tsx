@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Text } from 'react-native';
+import { useStore } from '../../src/store/useStore';
 import { color, font } from '../../src/theme/tokens';
 
 function Glyph({ char, focused }: { char: string; focused: boolean }) {
@@ -19,6 +20,15 @@ function Glyph({ char, focused }: { char: string; focused: boolean }) {
 }
 
 export default function TabsLayout() {
+  const registerPush = useStore((s) => s.registerPush);
+
+  // Contextual moment for the notifications ask (PRD §9.3): the user has a
+  // working account and just entered the app — "know when someone messages
+  // you" is now a fair request.
+  useEffect(() => {
+    void registerPush();
+  }, [registerPush]);
+
   return (
     <Tabs
       screenOptions={{

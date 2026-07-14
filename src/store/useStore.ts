@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { ReasonTag, ReportCategory, TravelMode, TripPattern, User } from '../domain/types';
 import { filterMessage } from '../lib/contentFilter';
+import { getPushToken } from '../lib/push';
 import { supabase } from '../lib/supabase';
 
 /**
@@ -128,6 +130,9 @@ interface AppState {
   /** Transient presence: create (or reuse) a one-off place pattern and check
    *  in atomically — for travelers passing through, not recurring routes. */
   hereNow: (venue: string, code: string) => Promise<string | null>;
+  /** Registers this device's Expo push token so messages/requests reach the
+   *  lock screen. No-op on web or until FCM credentials exist. */
+  registerPush: () => Promise<void>;
   checkIn: (patternId: string) => Promise<string | null>;
   endCheckIn: (patternId: string) => Promise<void>;
   loadPeople: (patternId: string) => Promise<void>;
@@ -371,6 +376,9 @@ export const useStore = create<AppState>()(
       },
 
       signOut: async () => {
+        // This device stops receiving pushes for the account it's leaving.
+        const myId = get().myId;
+        if (myId) await supabase.from('push_tokens').delete().eq('user_id', myId);
         await supabase.auth.signOut();
       },
 
@@ -523,6 +531,19 @@ export const useStore = create<AppState>()(
         const { [id]: _gone, ...reminders } = get().reminders;
         set({ reminders });
         await get().refresh();
+      },
+
+      registerPush: async () => {
+        const myId = get().myId;
+        if (!myId) return;
+        const token = await getPushToken();
+        if (!token) return;
+        await supabase
+          .from('push_tokens')
+          .upsert(
+            { user_id: myId, token, platform: Platform.OS, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id,token' },
+          );
       },
 
       hereNow: async (venue, code) => {

@@ -9,7 +9,8 @@ import {
   PublicSans_600SemiBold,
 } from '@expo-google-fonts/public-sans';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import * as Notifications from 'expo-notifications';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Text, View } from 'react-native';
@@ -45,6 +46,15 @@ export default function RootLayout() {
     });
     return () => sub.remove();
   }, [boot, refresh]);
+
+  // Tapping a push opens the thing it's about (data.url from notify_user).
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((resp) => {
+      const url = resp.notification.request.content.data?.url;
+      if (typeof url === 'string' && url.startsWith('/')) router.push(url as never);
+    });
+    return () => sub.remove();
+  }, []);
 
   if ((!fontsLoaded && !fontError && !fontTimeout) || !booted) {
     return (
