@@ -1,38 +1,74 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import BoardRow from '../../src/components/BoardRow';
 import Screen from '../../src/components/Screen';
 import SplitFlap from '../../src/components/SplitFlap';
 import { Button } from '../../src/components/ui';
 import { modeCode } from '../../src/domain/vocab';
-import {
-  cancelReminders,
-  ensurePermission,
-  remindersSupported,
-  schedulePatternReminders,
-} from '../../src/lib/reminders';
 import { formatRemaining } from '../../src/lib/time';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
 /**
- * THE BOARD — the app's single home for routes (PRD §5.3). One departure
- * board carries it all: declare trips, check in ("I'm traveling now"),
- * see live counts, and drill into who's on a route. Counts come from the
- * board_summary RPC (aggregates before identities). Split-flap moment #1
- * fires when a check-in goes live. This absorbed the former Trips tab —
- * two tabs were rendering the same list with different buttons.
+ * THE BOARD — the app's single home for routes (PRD §5.3). Reads like a
+ * departure board: each row is a route; the right-hand column is its status
+ * AND its one action (CHECK IN → LIVE countdown → tap to end), the way a
+ * real board shows ON TIME / BOARDING. Managing a trip (reminders, remove)
+ * lives on the route's own screen — the board stays a display, not a form.
+ * Split-flap moment #1 fires when a check-in goes live.
  */
+
+function StatusChip({
+  label,
+  sub,
+  tone,
+  onPress,
+  a11y,
+}: {
+  label: string;
+  sub?: string;
+  tone: 'action' | 'live' | 'muted';
+  onPress?: () => void;
+  a11y: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={!onPress}
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={a11y}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.chip,
+        tone === 'action' && styles.chipAction,
+        tone === 'live' && styles.chipLive,
+        pressed && onPress ? { opacity: 0.7 } : null,
+      ]}
+    >
+      {sub ? (
+        <Text style={[styles.chipSub, tone === 'live' && { color: color.signal }]}>{sub}</Text>
+      ) : null}
+      <Text
+        style={[
+          styles.chipLabel,
+          tone === 'action' && { color: color.amberTextOnChalk },
+          tone === 'live' && { color: color.signal },
+          tone === 'muted' && { color: color.textMutedOnChalk },
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function Board() {
   const router = useRouter();
   const board = useStore((s) => s.board);
   const refresh = useStore((s) => s.refresh);
   const checkIn = useStore((s) => s.checkIn);
   const endCheckIn = useStore((s) => s.endCheckIn);
-  const removePattern = useStore((s) => s.removePattern);
-  const reminders = useStore((s) => s.reminders);
-  const setReminder = useStore((s) => s.setReminder);
   const [justCheckedIn, setJustCheckedIn] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -42,7 +78,7 @@ export default function Board() {
     }, [refresh]),
   );
 
-  // Tick each half-minute so "Xm left" and expired check-ins roll over live.
+  // Tick each half-minute so countdowns and expired check-ins roll over live.
   const [, setTick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 30_000);
@@ -51,32 +87,22 @@ export default function Board() {
 
   const now = Date.now();
 
-  const toggleReminder = async (patternId: string) => {
-    const entry = board.find((b) => b.pattern.id === patternId);
-    if (!entry) return;
-    if (!remindersSupported()) {
-      Alert.alert('Not available here', 'Reminders work in the installed app, not the web preview.');
-      return;
-    }
-    const existing = reminders[patternId];
-    if (existing) {
-      await cancelReminders(existing);
-      setReminder(patternId, null);
-      return;
-    }
-    const ok = await ensurePermission();
-    if (!ok) {
-      Alert.alert('Notifications are off', 'Allow notifications for Commuter Connect in system settings to get window reminders.');
-      return;
-    }
-    const ids = await schedulePatternReminders(entry.pattern);
-    setReminder(patternId, ids);
+  const goLive = (patternId: string) => {
+    setBusyId(patternId);
+    void checkIn(patternId).then((err) => {
+      setBusyId(null);
+      if (err) {
+        Alert.alert('Check-in didn’t go through', err);
+        return;
+      }
+      setJustCheckedIn(patternId);
+    });
   };
 
-  const confirmRemove = (id: string, label: string) => {
-    Alert.alert('Remove trip pattern?', `“${label}” and any active check-in on it will be removed.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => void removePattern(id) },
+  const confirmEnd = (patternId: string) => {
+    Alert.alert('End this check-in?', 'You’ll stop being discoverable on this route right away.', [
+      { text: 'Keep it', style: 'cancel' },
+      { text: 'End check-in', style: 'destructive', onPress: () => void endCheckIn(patternId) },
     ]);
   };
 
@@ -111,74 +137,60 @@ export default function Board() {
           />
         </View>
       ) : (
-        <View style={{ gap: space(4) }}>
+        <View style={{ gap: space(2.5) }}>
           {board.map(({ pattern: p, liveCount, memberCount, checkedInUntil }, i) => {
             const active = !!checkedInUntil && checkedInUntil > now;
             return (
-              <View key={p.id} style={styles.card}>
-                <BoardRow
-                  left={modeCode(p.mode)}
-                  leftSub={p.oneOff ? 'TODAY' : `${p.windowStart}–${p.windowEnd}`}
-                  title={p.routeOrLine}
-                  subtitle={
-                    active
-                      ? `${liveCount} ${liveCount === 1 ? 'person' : 'people'} here now — tap to see who`
-                      : liveCount > 0
-                        ? `${liveCount} ${liveCount === 1 ? 'person who shares' : 'people who share'} this ${p.mode === 'place' ? 'spot' : 'commute'} checked in now`
-                        : memberCount > 0
-                          ? `${memberCount} ${memberCount === 1 ? 'person rides' : 'people ride'} this route · nobody’s checked in yet — be the flip`
+              <BoardRow
+                key={p.id}
+                left={modeCode(p.mode)}
+                leftSub={p.oneOff ? 'TODAY' : `${p.windowStart}–${p.windowEnd}`}
+                title={p.routeOrLine}
+                subtitle={
+                  active
+                    ? `${liveCount} ${liveCount === 1 ? 'person' : 'people'} here now — tap to see who`
+                    : liveCount > 0
+                      ? `${liveCount} ${liveCount === 1 ? 'person' : 'people'} checked in now`
+                      : memberCount > 0
+                        ? `${memberCount} ${memberCount === 1 ? 'person rides' : 'people ride'} this — nobody’s live yet`
+                        : p.oneOff
+                          ? 'One-time — clears itself after it ends'
                           : 'You’re first on this route — it grows from here'
-                  }
-                  live={active}
-                  index={i}
-                  onPress={() => router.push({ pathname: '/pattern/[id]', params: { id: p.id } })}
-                />
-                <View style={styles.cardActions}>
-                  {active ? (
-                    <>
-                      <Text style={styles.window}>
-                        LIVE · {formatRemaining(checkedInUntil, now)} REMAINING
-                      </Text>
-                      <Button label="End check-in" variant="quiet" onPress={() => void endCheckIn(p.id)} />
-                    </>
+                }
+                live={active}
+                index={i}
+                onPress={() => router.push({ pathname: '/pattern/[id]', params: { id: p.id } })}
+                right={
+                  active ? (
+                    <StatusChip
+                      tone="live"
+                      sub="LIVE"
+                      label={formatRemaining(checkedInUntil, now).toUpperCase()}
+                      onPress={() => confirmEnd(p.id)}
+                      a11y="Checked in — tap to end early"
+                    />
                   ) : p.oneOff ? (
-                    <Text style={styles.emptyBody}>Ended — this clears off your board within the hour.</Text>
+                    <StatusChip tone="muted" label="CLEARING" a11y="Ended — clears itself soon" />
                   ) : (
-                    <>
-                      <Button
-                        label={busyId === p.id ? 'Checking in…' : 'I’m traveling now'}
-                        disabled={busyId === p.id}
-                        onPress={() => {
-                          setBusyId(p.id);
-                          void checkIn(p.id).then((err) => {
-                            setBusyId(null);
-                            if (err) {
-                              Alert.alert('Check-in didn’t go through', err);
-                              return;
-                            }
-                            setJustCheckedIn(p.id);
-                          });
-                        }}
-                        style={{ flexGrow: 1 }}
-                      />
-                      <Button
-                        label={reminders[p.id] ? '🔔 Reminding' : 'Remind me'}
-                        variant="quiet"
-                        onPress={() => void toggleReminder(p.id)}
-                      />
-                      <Button label="Remove" variant="quiet" onPress={() => confirmRemove(p.id, p.routeOrLine)} />
-                    </>
-                  )}
-                </View>
-              </View>
+                    <StatusChip
+                      tone="action"
+                      label={busyId === p.id ? '…' : 'CHECK IN'}
+                      onPress={busyId === p.id ? undefined : () => goLive(p.id)}
+                      a11y={`Check in on ${p.routeOrLine}`}
+                    />
+                  )
+                }
+              />
             );
           })}
-          <Button label="Add a trip pattern" variant="ink" onPress={() => router.push('/add-pattern')} />
-          <Button
-            label="Passing through somewhere today?"
-            variant="quiet"
-            onPress={() => router.push('/here-now')}
-          />
+          <View style={{ gap: space(2.5), marginTop: space(2) }}>
+            <Button label="Add a trip pattern" variant="ink" onPress={() => router.push('/add-pattern')} />
+            <Button
+              label="Passing through somewhere today?"
+              variant="quiet"
+              onPress={() => router.push('/here-now')}
+            />
+          </View>
         </View>
       )}
     </Screen>
@@ -198,7 +210,16 @@ const styles = StyleSheet.create({
   empty: { gap: space(4), paddingTop: space(10) },
   emptyTitle: { ...type.title, color: color.textOnChalk },
   emptyBody: { ...type.body, color: color.textMutedOnChalk },
-  card: { gap: space(2.5) },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: space(2.5), flexWrap: 'wrap' },
-  window: { ...type.mono, color: color.signal, flexGrow: 1 },
+  chip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: space(2),
+    paddingHorizontal: space(2.5),
+    borderRadius: radius.chip,
+    minWidth: 76,
+  },
+  chipAction: { borderWidth: 1, borderColor: color.amber },
+  chipLive: { borderWidth: 1, borderColor: color.signal, backgroundColor: color.signalTintBg },
+  chipLabel: { fontFamily: 'IBMPlexMono_500Medium', fontSize: 11, letterSpacing: 0.8 },
+  chipSub: { ...type.monoSmall, fontSize: 8, letterSpacing: 1.2 },
 });

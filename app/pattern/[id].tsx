@@ -4,6 +4,12 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
 import { Button, Chip, Monogram, VerifiedBadge } from '../../src/components/ui';
 import { modeCode, reasonLabel } from '../../src/domain/vocab';
+import {
+  cancelReminders,
+  ensurePermission,
+  remindersSupported,
+  schedulePatternReminders,
+} from '../../src/lib/reminders';
 import { useStore } from '../../src/store/useStore';
 import { color, radius, space, type } from '../../src/theme/tokens';
 
@@ -19,6 +25,9 @@ export default function PatternPeople() {
   const people = useStore((s) => s.people);
   const loadPeople = useStore((s) => s.loadPeople);
   const blockUser = useStore((s) => s.blockUser);
+  const removePattern = useStore((s) => s.removePattern);
+  const reminders = useStore((s) => s.reminders);
+  const setReminder = useStore((s) => s.setReminder);
 
   useFocusEffect(
     useCallback(() => {
@@ -30,6 +39,39 @@ export default function PatternPeople() {
   if (!entry) return null;
   const pattern = entry.pattern;
   const cards = people[id ?? ''] ?? [];
+
+  const toggleReminder = async () => {
+    if (!remindersSupported()) {
+      Alert.alert('Not available here', 'Reminders work in the installed app, not the web preview.');
+      return;
+    }
+    const existing = reminders[pattern.id];
+    if (existing) {
+      await cancelReminders(existing);
+      setReminder(pattern.id, null);
+      return;
+    }
+    const ok = await ensurePermission();
+    if (!ok) {
+      Alert.alert('Notifications are off', 'Allow notifications for Commuter Connect in system settings to get window reminders.');
+      return;
+    }
+    const ids = await schedulePatternReminders(pattern);
+    setReminder(pattern.id, ids);
+  };
+
+  const confirmRemoveTrip = () => {
+    Alert.alert('Remove trip pattern?', `“${pattern.routeOrLine}” and any active check-in on it will be removed.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          void removePattern(pattern.id).then(() => router.back());
+        },
+      },
+    ]);
+  };
 
   const confirmBlock = (userId: string, name: string) => {
     Alert.alert(
@@ -47,10 +89,22 @@ export default function PatternPeople() {
       <View style={{ gap: space(4), paddingTop: space(2) }}>
         <View style={styles.routeHead}>
           <Text style={styles.routeCode}>
-            {modeCode(pattern.mode)} · {pattern.windowStart}–{pattern.windowEnd}
+            {modeCode(pattern.mode)} · {pattern.oneOff ? 'TODAY' : `${pattern.windowStart}–${pattern.windowEnd}`}
           </Text>
           <Text style={styles.routeName}>{pattern.routeOrLine}</Text>
           <Text style={styles.routeSub}>{pattern.direction}</Text>
+        </View>
+
+        {/* Trip management lives here, off the board — the board is a display. */}
+        <View style={styles.manageRow}>
+          {!pattern.oneOff ? (
+            <Button
+              label={reminders[pattern.id] ? '🔔 Reminding' : 'Remind me'}
+              variant="quiet"
+              onPress={() => void toggleReminder()}
+            />
+          ) : null}
+          <Button label="Remove trip" variant="quiet" onPress={confirmRemoveTrip} />
         </View>
 
         {cards.length === 0 ? (
@@ -105,6 +159,7 @@ export default function PatternPeople() {
 
 const styles = StyleSheet.create({
   routeHead: { gap: 3 },
+  manageRow: { flexDirection: 'row', gap: space(2.5), flexWrap: 'wrap' },
   routeCode: { ...type.mono, color: color.amberTextOnChalk },
   routeName: { ...type.title, color: color.textOnChalk },
   routeSub: { ...type.caption, color: color.textMutedOnChalk },
