@@ -14,6 +14,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [failedAttempt, setFailedAttempt] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -26,11 +27,21 @@ export default function SignIn() {
     const err = await signIn(email.trim(), password);
     setBusy(false);
     if (err) {
+      // Auth deliberately doesn't reveal whether the email has an account
+      // (that would let anyone probe who's a member). So instead of
+      // redirecting, surface the likely next step alongside the error.
       setError(err);
+      setFailedAttempt(true);
       return;
     }
     router.replace('/');
   };
+
+  const toSignup = () =>
+    router.replace({
+      pathname: '/onboarding/signup',
+      params: email.trim() ? { email: email.trim() } : undefined,
+    });
 
   return (
     <Screen>
@@ -54,6 +65,12 @@ export default function SignIn() {
           placeholder="••••••••"
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {failedAttempt ? (
+          <Text style={styles.hint}>
+            Double-check the password, or — if you’ve never signed up on this email —
+            create the account below.
+          </Text>
+        ) : null}
         <Button label={busy ? 'Signing in…' : 'Sign in'} onPress={submit} disabled={busy} />
         <Button
           label="Forgot password?"
@@ -61,9 +78,9 @@ export default function SignIn() {
           onPress={() => router.push('/onboarding/forgot')}
         />
         <Button
-          label="New here? Create an account"
+          label={failedAttempt && email.trim() ? 'Create an account with this email' : 'New here? Create an account'}
           variant="quiet"
-          onPress={() => router.replace('/onboarding/signup')}
+          onPress={toSignup}
         />
       </View>
     </Screen>
@@ -73,4 +90,5 @@ export default function SignIn() {
 const styles = StyleSheet.create({
   lede: { ...type.title, color: color.textOnChalk },
   error: { ...type.caption, color: color.caution },
+  hint: { ...type.caption, color: color.textMutedOnChalk },
 });
