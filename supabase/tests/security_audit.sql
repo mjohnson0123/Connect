@@ -1,4 +1,5 @@
 -- PASS 2 — Adversarial security audit (executable).
+-- Last run: 2026-07-14 against the live project via SQL Editor — PASSED (no leaks).
 -- Run via MCP execute_sql when the Supabase bridge is up. Creates two
 -- throwaway users, attacks the RLS policies and RPCs from each side, raises
 -- an exception on ANY leak, and cleans up after itself. All assertions run
