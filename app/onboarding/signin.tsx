@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
@@ -10,6 +10,7 @@ import { color, space, type } from '../../src/theme/tokens';
 export default function SignIn() {
   const router = useRouter();
   const signIn = useStore((s) => s.signIn);
+  const myId = useStore((s) => s.myId);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,6 +37,10 @@ export default function SignIn() {
     }
     router.replace('/');
   };
+
+  // Auth-gate guard: back-navigation must never surface sign-in to a
+  // signed-in user (it reads as being logged out).
+  if (myId) return <Redirect href="/" />;
 
   const toSignup = () =>
     router.replace({

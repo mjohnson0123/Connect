@@ -1,10 +1,11 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SplitFlap from '../../src/components/SplitFlap';
 import { Button } from '../../src/components/ui';
 import { useReduceMotion } from '../../src/lib/useReduceMotion';
+import { useStore } from '../../src/store/useStore';
 import { color, font, space, type } from '../../src/theme/tokens';
 
 /**
@@ -41,6 +42,12 @@ export default function Welcome() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
+  const myId = useStore((s) => s.myId);
+
+  // Auth-gate guard: signed-in users must never land here (the Android back
+  // button can pop the stack down to this screen — without the guard that
+  // reads as "the app logged me out").
+  if (myId) return <Redirect href="/" />;
 
   return (
     <View style={[styles.root, { paddingTop: insets.top + space(12), paddingBottom: insets.bottom + space(8) }]}>

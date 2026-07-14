@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Screen from '../../src/components/Screen';
@@ -15,6 +15,7 @@ export default function SignUp() {
   const router = useRouter();
   const params = useLocalSearchParams<{ email?: string }>();
   const signUp = useStore((s) => s.signUp);
+  const myId = useStore((s) => s.myId);
 
   const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
@@ -22,6 +23,10 @@ export default function SignUp() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
+
+  // Auth-gate guard: a signed-in session renders the app, never this screen
+  // (also fires the moment sign-up succeeds, routing through the index gate).
+  if (myId) return <Redirect href="/" />;
 
   // Auto-insert slashes while typing: 03141990 → 03/14/1990 (and deletes cleanly).
   const formatDob = (raw: string) => {
