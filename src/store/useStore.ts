@@ -88,6 +88,10 @@ interface AppState {
   /** First-run feature tour shown once per install; re-openable from You tab. */
   tourSeen: boolean;
   setTourSeen: () => void;
+  /** Flight patterns whose "also check in at the airport?" offer was declined
+   *  — the bridge prompt asks once per pattern, never nags. */
+  airportOfferDismissed: string[];
+  dismissAirportOffer: (patternId: string) => void;
 
   boot: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -225,6 +229,7 @@ export const useStore = create<AppState>()(
       blocked: [],
       reminders: {},
       tourSeen: false,
+      airportOfferDismissed: [],
 
       boot: async () => {
         const { data } = await supabase.auth.getSession();
@@ -722,6 +727,8 @@ export const useStore = create<AppState>()(
       },
 
       setTourSeen: () => set({ tourSeen: true }),
+      dismissAirportOffer: (patternId) =>
+        set((s) => ({ airportOfferDismissed: [...s.airportOfferDismissed, patternId] })),
 
       setReminder: (patternId, notificationIds) => {
         const current = get().reminders;
@@ -737,7 +744,12 @@ export const useStore = create<AppState>()(
       name: 'commuter-connect-local-v1',
       storage: createJSONStorage(() => AsyncStorage),
       // Only device-local concerns persist here; Supabase owns all shared data.
-      partialize: (s) => ({ reminders: s.reminders, tourSeen: s.tourSeen }) as AppState,
+      partialize: (s) =>
+        ({
+          reminders: s.reminders,
+          tourSeen: s.tourSeen,
+          airportOfferDismissed: s.airportOfferDismissed,
+        }) as AppState,
     },
   ),
 );

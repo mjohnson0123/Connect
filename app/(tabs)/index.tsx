@@ -69,8 +69,12 @@ export default function Board() {
   const refresh = useStore((s) => s.refresh);
   const checkIn = useStore((s) => s.checkIn);
   const endCheckIn = useStore((s) => s.endCheckIn);
+  const hereNow = useStore((s) => s.hereNow);
+  const airportOfferDismissed = useStore((s) => s.airportOfferDismissed);
+  const dismissAirportOffer = useStore((s) => s.dismissAirportOffer);
   const [justCheckedIn, setJustCheckedIn] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [offerState, setOfferState] = useState<'idle' | 'busy' | 'done'>('idle');
 
   useFocusEffect(
     useCallback(() => {
@@ -95,8 +99,33 @@ export default function Board() {
         Alert.alert('Check-in didn’t go through', err);
         return;
       }
+      setOfferState('idle');
       setJustCheckedIn(patternId);
     });
+  };
+
+  // The bridge: a flight check-in means time at the departure airport — offer
+  // (once per pattern, opt-in) to also be discoverable around the venue.
+  // Rides the one-off machinery, so airport presence expires on its own.
+  const justEntry = justCheckedIn ? board.find((b) => b.pattern.id === justCheckedIn) : undefined;
+  const offerCode =
+    justEntry &&
+    justEntry.pattern.mode === 'flight' &&
+    justEntry.pattern.stationOrCode &&
+    !airportOfferDismissed.includes(justEntry.pattern.id)
+      ? justEntry.pattern.stationOrCode
+      : null;
+
+  const acceptOffer = async () => {
+    if (!offerCode) return;
+    setOfferState('busy');
+    const err = await hereNow('', offerCode);
+    if (err) {
+      setOfferState('idle');
+      Alert.alert('Couldn’t check in at the airport', err);
+      return;
+    }
+    setOfferState('done');
   };
 
   const confirmEnd = (patternId: string) => {
@@ -119,6 +148,33 @@ export default function Board() {
             You’re discoverable to people on this route for the next 3 hours — end it
             anytime. Nothing about your position is shared, only the shared route.
           </Text>
+          {offerCode ? (
+            offerState === 'done' ? (
+              <Text style={styles.offerDone}>
+                ✓ Also on the {offerCode} board — that one clears itself later.
+              </Text>
+            ) : (
+              <View style={styles.offer}>
+                <Text style={styles.offerText}>
+                  You’ll be at {offerCode} for a bit — also be discoverable around the
+                  airport while you’re there?
+                </Text>
+                <View style={styles.offerActions}>
+                  <Button
+                    label={offerState === 'busy' ? 'Checking in…' : `Also check in at ${offerCode}`}
+                    onPress={() => void acceptOffer()}
+                    disabled={offerState === 'busy'}
+                    style={{ flexGrow: 1 }}
+                  />
+                  <Button
+                    label="Just my flight"
+                    variant="quietOnInk"
+                    onPress={() => dismissAirportOffer(justCheckedIn)}
+                  />
+                </View>
+              </View>
+            )
+          ) : null}
         </View>
       ) : null}
 
@@ -207,6 +263,10 @@ const styles = StyleSheet.create({
     marginBottom: space(3),
   },
   flapCaption: { ...type.caption, color: color.textMutedOnInk },
+  offer: { gap: space(3), marginTop: space(1) },
+  offerText: { ...type.body, fontSize: 14, lineHeight: 20, color: color.chalk },
+  offerActions: { flexDirection: 'row', gap: space(2.5), flexWrap: 'wrap' },
+  offerDone: { ...type.caption, color: color.signal },
   empty: { gap: space(4), paddingTop: space(10) },
   emptyTitle: { ...type.title, color: color.textOnChalk },
   emptyBody: { ...type.body, color: color.textMutedOnChalk },
