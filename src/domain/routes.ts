@@ -18,7 +18,9 @@ import { TravelMode } from './types';
  * turns every first entry into the guardrail for the next person.
  */
 
-const FILLER = /\b(line|route|rte|train|bus|ferry|the|station|stop|terminal)\b/g;
+// Mirrored by public.normalize_text server-side — change BOTH together.
+// "dc" is filler because "Washington DC" and "Washington" must be one route.
+const FILLER = /\b(line|route|rte|train|bus|ferry|the|station|stop|terminal|dc)\b/g;
 
 export function normalizeText(s: string): string {
   return s

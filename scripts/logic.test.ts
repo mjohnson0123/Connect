@@ -165,6 +165,19 @@ test('gate: signed out goes to welcome; loading state redirects nowhere', () => 
   );
 });
 
+test('“Washington DC” and “Washington” converge to one route', () => {
+  const dc = groundRoute('MARC', 'Camden', 'Washington DC');
+  const plain = groundRoute('MARC', 'Camden', 'Washington');
+  assert.equal(
+    routeKeyFor('train', undefined, dc.routeOrLine, dc.direction),
+    routeKeyFor('train', undefined, plain.routeOrLine, plain.direction),
+  );
+  assert.equal(
+    routeKeyFor('train', undefined, dc.routeOrLine, dc.direction),
+    'train:marc-camden:toward-washington',
+  );
+});
+
 // ── Place keys: whole-venue matching (mirrors public.route_key_v2) ──────────
 test('places with the same airport code converge across venues', () => {
   const bar = placeRoute('Whitmore Bar', 'BWI');
