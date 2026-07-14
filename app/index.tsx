@@ -1,6 +1,7 @@
 import { Redirect } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { nextRoute } from '../src/lib/routeGate';
 import { useStore } from '../src/store/useStore';
 import { Button } from '../src/components/ui';
 import { color, space, type } from '../src/theme/tokens';
@@ -33,8 +34,12 @@ export default function Index() {
       </View>
     );
   }
-  if (me.verificationStatus !== 'verified') return <Redirect href="/onboarding/verify" />;
-  if (!me.displayName) return <Redirect href="/onboarding/profile" />;
-  if (!tourSeen) return <Redirect href="/tour" />;
-  return <Redirect href="/(tabs)" />;
+  const route = nextRoute({
+    myId,
+    hasProfile: true,
+    verified: me.verificationStatus === 'verified',
+    hasDisplayName: !!me.displayName,
+    tourSeen,
+  });
+  return <Redirect href={(route ?? '/(tabs)') as never} />;
 }

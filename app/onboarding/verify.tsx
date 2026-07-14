@@ -186,9 +186,14 @@ export default function Verify() {
             <Text style={styles.title}>Everyone here is a real person</Text>
             <Text style={styles.body}>
               A quick face check confirms there’s a live person behind this profile — the
-              same check rideshare drivers pass. You’ll center your face in an oval for a
-              few seconds. The check runs on Amazon’s verification service; your face
-              data is used only for this check.
+              same check rideshare drivers pass. The scan starts as soon as you tap the
+              button: center your face in the oval and hold still for a few seconds. It
+              runs on Amazon’s verification service; your face data is used only for
+              this check.
+            </Text>
+            <Text style={styles.caution}>
+              The check briefly flashes colored lights. If you’re sensitive to flashing
+              light, ask us for an alternative instead.
             </Text>
             <Button label={busy ? 'Starting…' : 'Start face check'} onPress={() => void start()} disabled={busy} />
             {error ? <Text style={styles.caution}>{error}</Text> : null}

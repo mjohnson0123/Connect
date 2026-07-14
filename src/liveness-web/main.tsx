@@ -40,6 +40,11 @@ function App() {
       <FaceLivenessDetector
         sessionId={cfg.sessionId}
         region={cfg.region}
+        // The app's own intro screen is the start screen (it carries the
+        // camera-permission ask and the photosensitivity warning), so AWS's
+        // "Get ready" page — whose begin button sat below the fold on tall
+        // camera previews — is skipped and the check starts immediately.
+        disableStartScreen
         onAnalysisComplete={async () => post({ type: 'complete' })}
         onUserCancel={() => post({ type: 'cancel' })}
         onError={(err) =>

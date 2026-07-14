@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   Animated,
@@ -56,6 +56,7 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
 
 export default function Tour() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const insets = useSafeAreaInsets();
   const setTourSeen = useStore((s) => s.setTourSeen);
   const [page, setPage] = useState(0);
@@ -63,10 +64,16 @@ export default function Tour() {
   const scrollRef = useRef<Animated.FlatList<(typeof SLIDES)[number]>>(null);
   const width = Dimensions.get('window').width;
 
+  // Re-opened from the You tab → return there. Otherwise this is first-run
+  // onboarding: route deterministically through the index gate (which sends
+  // brand-new accounts on to verification). Never router.back() here — the
+  // stack under the tour can be the welcome screen, and popping to it threw
+  // freshly signed-up users out of the app.
+  const fromYouTab = from === 'you';
   const finish = () => {
     setTourSeen();
-    if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)');
+    if (fromYouTab && router.canGoBack()) router.back();
+    else router.replace('/');
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -124,7 +131,7 @@ export default function Tour() {
             <View key={i} style={[styles.dot, i === page && styles.dotActive]} />
           ))}
         </View>
-        <Button label={last ? 'Start connecting' : 'Next'} onPress={next} />
+        <Button label={last ? (fromYouTab ? 'Done' : 'Continue') : 'Next'} onPress={next} />
       </View>
     </View>
   );

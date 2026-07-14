@@ -38,10 +38,13 @@ const html = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>
 html,body{margin:0;padding:0;height:100%;background:#12161C;overflow-y:auto;-webkit-overflow-scrolling:touch}
-/* min-height (not height) lets the AWS start screen grow past one viewport
-   and scroll instead of clipping its start button on short/wide screens. */
-#root{min-height:100%;display:flex;flex-direction:column;justify-content:center}
-#root>*{width:100%}
+#root{min-height:100%;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;padding:8px 0 24px}
+/* The camera preview's height follows its width (3:4). Cap the WIDTH from the
+   available HEIGHT so preview + instructions + controls always fit one
+   viewport — no scrolling to find controls. ~200px is the non-video budget.
+   (Scroll remains as a last-resort fallback below.) */
+#root>*{width:100%;max-width:calc((100vh - 200px) * 0.75);margin:0 auto}
+@supports (height: 100dvh){#root>*{max-width:calc((100dvh - 200px) * 0.75)}}
 </style>
 <style>${css}</style>
 </head>

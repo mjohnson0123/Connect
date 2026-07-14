@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { filterMessage } from '../src/lib/contentFilter';
 import { flightRoute, groundRoute, IATA, normalizeText, placeRoute, routeKeyFor } from '../src/domain/routes';
+import { nextRoute } from '../src/lib/routeGate';
 import { formatClock, formatDays, formatRemaining, HOUR, MINUTE } from '../src/lib/time';
 
 /**
@@ -125,4 +126,47 @@ test('formatDays compresses common patterns', () => {
 test('formatClock zero-pads', () => {
   const d = new Date(2026, 0, 5, 7, 5).getTime();
   assert.equal(formatClock(d), '07:05');
+});
+
+// ── Onboarding gate: order produced real field bugs — keep it pinned ─────────
+test('gate: fresh signup sees the tour before verification or profile', () => {
+  // Bug regression: tour used to fire AFTER profile setup.
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: true, verified: false, hasDisplayName: false, tourSeen: false }),
+    '/tour',
+  );
+});
+
+test('gate: after the tour, onboarding continues to verification, then profile', () => {
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: true, verified: false, hasDisplayName: false, tourSeen: true }),
+    '/onboarding/verify',
+  );
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: true, verified: true, hasDisplayName: false, tourSeen: true }),
+    '/onboarding/profile',
+  );
+  // Bug regression: finishing the tour must land in the app, never back on welcome.
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: true, verified: true, hasDisplayName: true, tourSeen: true }),
+    '/(tabs)',
+  );
+});
+
+test('gate: signed out goes to welcome; loading state redirects nowhere', () => {
+  assert.equal(
+    nextRoute({ myId: null, hasProfile: false, verified: false, hasDisplayName: false, tourSeen: false }),
+    '/onboarding/welcome',
+  );
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: false, verified: false, hasDisplayName: false, tourSeen: false }),
+    null,
+  );
+});
+
+test('gate: returning verified user on a new device gets the tour once, then the app', () => {
+  assert.equal(
+    nextRoute({ myId: 'u1', hasProfile: true, verified: true, hasDisplayName: true, tourSeen: false }),
+    '/tour',
+  );
 });

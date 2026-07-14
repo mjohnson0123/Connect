@@ -65,7 +65,9 @@ export default function SignUp() {
       setError(err);
       return;
     }
-    router.replace('/onboarding/verify');
+    // Through the index gate, not straight to verify: the gate shows the
+    // first-run tour before any verification/profile asks.
+    router.replace('/');
   };
 
   if (confirmEmail) {
