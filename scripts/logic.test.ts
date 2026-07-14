@@ -178,25 +178,38 @@ test('“Washington DC” and “Washington” converge to one route', () => {
   );
 });
 
-// ── Place keys: whole-venue matching (mirrors public.route_key_v2) ──────────
-test('places with the same airport code converge across venues', () => {
-  const bar = placeRoute('Whitmore Bar', 'BWI');
-  const gate = placeRoute('Gate B12', 'bwi');
+// ── Place keys (mirrors public.route_key_v3) ────────────────────────────────
+// Venue-wide is ONLY for one-offs (people in motion); recurring places match
+// the exact spot — a rail regular can't get through security to a gate.
+test('one-off check-ins converge venue-wide; recurring places stay spot-exact', () => {
+  const passing = placeRoute('Passing through', 'BWI');
+  const layover = placeRoute('Layover', 'bwi');
   assert.equal(
-    routeKeyFor('place', undefined, bar.routeOrLine, bar.direction, 'BWI'),
-    routeKeyFor('place', undefined, gate.routeOrLine, gate.direction, 'bwi'),
+    routeKeyFor('place', undefined, passing.routeOrLine, passing.direction, 'BWI', true),
+    routeKeyFor('place', undefined, layover.routeOrLine, layover.direction, 'bwi', true),
   );
-  assert.equal(routeKeyFor('place', undefined, bar.routeOrLine, bar.direction, 'BWI'), 'place:bwi:regular');
+  assert.equal(
+    routeKeyFor('place', undefined, passing.routeOrLine, passing.direction, 'BWI', true),
+    'place:bwi:regular',
+  );
+  // Same airport, different spots, recurring: NOT a match.
+  const bar = placeRoute('Whitmore Bar', 'BWI');
+  const gate = placeRoute('Gate B12', 'BWI');
+  assert.notEqual(
+    routeKeyFor('place', undefined, bar.routeOrLine, bar.direction, 'BWI', false),
+    routeKeyFor('place', undefined, gate.routeOrLine, gate.direction, 'BWI', false),
+  );
+  // Same spot text converges for regulars (filler words stripped).
+  assert.equal(
+    routeKeyFor('place', undefined, 'Amtrak platform (BWI)', 'Regular', 'BWI', false),
+    routeKeyFor('place', undefined, 'The Amtrak Platform (BWI)', 'Regular', 'BWI', false),
+  );
 });
 
-test('places at different airports do not converge; no code falls back to venue', () => {
-  assert.notEqual(
-    routeKeyFor('place', undefined, 'Lounge (BWI)', 'Regular', 'BWI'),
-    routeKeyFor('place', undefined, 'Lounge (DCA)', 'Regular', 'DCA'),
-  );
+test('one-off with no code falls back to the spot text', () => {
   const noCode = placeRoute('Union Market', '');
   assert.equal(
-    routeKeyFor('place', undefined, noCode.routeOrLine, noCode.direction, ''),
+    routeKeyFor('place', undefined, noCode.routeOrLine, noCode.direction, '', true),
     'place:union-market:regular',
   );
 });

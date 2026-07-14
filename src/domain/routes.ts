@@ -37,11 +37,15 @@ export function routeKeyFor(
   routeText: string,
   direction: string,
   stationOrCode = '',
+  oneOff = false,
 ): string {
-  // Places match at the whole venue/airport: "Gate B12 (BWI)" and a bar at
-  // BWI share one key, so travelers meet across terminals. Trains, buses,
-  // and flights stay route-exact. Mirrors public.route_key_v2 server-side.
-  if (mode === 'place' && stationOrCode.trim()) {
+  // Venue-wide matching is only for people in motion: ONE-OFF place
+  // check-ins (including the flight→airport bridge) key on the code alone,
+  // so travelers passing through BWI today all meet. RECURRING places key
+  // on the exact spot — a rail-platform regular can't get through security
+  // to Gate C, so cross-checkpoint matches would be unmeetable. Trains,
+  // buses, and flights stay route-exact. Mirrors public.route_key_v3.
+  if (mode === 'place' && oneOff && stationOrCode.trim()) {
     return `place:${normalizeText(stationOrCode)}:regular`;
   }
   const route = routeId ?? normalizeText(routeText);

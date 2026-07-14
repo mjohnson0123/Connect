@@ -87,8 +87,8 @@ export default function AddPattern() {
       return;
     }
     const codeForKey = isFlight ? fromCode.trim() : venueCode.trim();
-    const newKey = routeKeyFor(mode, undefined, composed.routeOrLine, composed.direction, codeForKey);
-    if (patterns.some((pt) => routeKeyFor(pt.mode, pt.routeId, pt.routeOrLine, pt.direction, pt.stationOrCode) === newKey)) {
+    const newKey = routeKeyFor(mode, undefined, composed.routeOrLine, composed.direction, codeForKey, false);
+    if (patterns.some((pt) => routeKeyFor(pt.mode, pt.routeId, pt.routeOrLine, pt.direction, pt.stationOrCode, pt.oneOff) === newKey)) {
       setError('This route is already on your board.');
       return;
     }
@@ -147,7 +147,7 @@ export default function AddPattern() {
           <>
             <Field label="Place" value={venue} onChangeText={setVenue} placeholder="Gate C concourse" />
             <Field
-              label="Airport / station code — matches you across the whole venue"
+              label="Airport / station code (optional)"
               value={venueCode}
               onChangeText={setVenueCode}
               autoCapitalize="characters"
