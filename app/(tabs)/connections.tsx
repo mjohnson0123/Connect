@@ -66,7 +66,8 @@ export default function Connections() {
         <View style={{ gap: space(3) }}>
           <Text style={styles.discoverTitle}>Find your people</Text>
           <Text style={styles.discoverSub}>
-            Search any field — yours, or one you’re curious about.
+            Search any field — you’ll see people who share at least one of your routes
+            or places.
           </Text>
           <Field
             value={query}
@@ -84,8 +85,8 @@ export default function Connections() {
           {discoverPeople.length === 0 ? (
             <Text style={styles.emptyLine}>
               {query
-                ? 'Nobody in that field yet — try a broader term.'
-                : 'People who share your fields appear here. Search to reach any field on the platform.'}
+                ? 'Nobody on your routes matches that yet — try a broader term, or add more trips to widen your reach.'
+                : 'People on your routes who share your fields appear here. Search to reach any field.'}
             </Text>
           ) : (
             discoverPeople.map((p) => (

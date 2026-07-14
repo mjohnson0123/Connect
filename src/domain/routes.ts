@@ -29,7 +29,19 @@ export function normalizeText(s: string): string {
     .replace(/-{2,}/g, '-');
 }
 
-export function routeKeyFor(mode: TravelMode, routeId: string | undefined, routeText: string, direction: string): string {
+export function routeKeyFor(
+  mode: TravelMode,
+  routeId: string | undefined,
+  routeText: string,
+  direction: string,
+  stationOrCode = '',
+): string {
+  // Places match at the whole venue/airport: "Gate B12 (BWI)" and a bar at
+  // BWI share one key, so travelers meet across terminals. Trains, buses,
+  // and flights stay route-exact. Mirrors public.route_key_v2 server-side.
+  if (mode === 'place' && stationOrCode.trim()) {
+    return `place:${normalizeText(stationOrCode)}:regular`;
+  }
   const route = routeId ?? normalizeText(routeText);
   return `${mode}:${route}:${normalizeText(direction)}`;
 }

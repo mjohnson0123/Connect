@@ -165,6 +165,42 @@ test('gate: signed out goes to welcome; loading state redirects nowhere', () => 
   );
 });
 
+// ── Place keys: whole-venue matching (mirrors public.route_key_v2) ──────────
+test('places with the same airport code converge across venues', () => {
+  const bar = placeRoute('Whitmore Bar', 'BWI');
+  const gate = placeRoute('Gate B12', 'bwi');
+  assert.equal(
+    routeKeyFor('place', undefined, bar.routeOrLine, bar.direction, 'BWI'),
+    routeKeyFor('place', undefined, gate.routeOrLine, gate.direction, 'bwi'),
+  );
+  assert.equal(routeKeyFor('place', undefined, bar.routeOrLine, bar.direction, 'BWI'), 'place:bwi:regular');
+});
+
+test('places at different airports do not converge; no code falls back to venue', () => {
+  assert.notEqual(
+    routeKeyFor('place', undefined, 'Lounge (BWI)', 'Regular', 'BWI'),
+    routeKeyFor('place', undefined, 'Lounge (DCA)', 'Regular', 'DCA'),
+  );
+  const noCode = placeRoute('Union Market', '');
+  assert.equal(
+    routeKeyFor('place', undefined, noCode.routeOrLine, noCode.direction, ''),
+    'place:union-market:regular',
+  );
+});
+
+test('trains and flights keep exact-route keys regardless of stationOrCode', () => {
+  const marc = groundRoute('MARC', 'Penn Line', 'Washington');
+  assert.equal(
+    routeKeyFor('train', undefined, marc.routeOrLine, marc.direction, 'BAL'),
+    'train:marc-penn:toward-washington',
+  );
+  const fl = flightRoute('bwi', 'bos');
+  assert.equal(
+    routeKeyFor('flight', undefined, fl.routeOrLine, fl.direction, 'BWI'),
+    routeKeyFor('flight', undefined, fl.routeOrLine, fl.direction, ''),
+  );
+});
+
 // ── Vocabulary: tags are stored on profiles — groups must never mutate them ──
 test('industry groups preserve the canonical tag set (no drops, no dupes)', () => {
   assert.equal(INDUSTRIES.length, 37);
