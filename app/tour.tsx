@@ -50,7 +50,7 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
     glyph: '●',
     eyebrow: 'YOUR CONTROLS',
     title: 'You run your visibility',
-    body: 'Block instantly and silently. Report anything — a person reviews every report. End check-ins early, edit your profile, or delete your account anytime from the You tab.',
+    body: 'Block instantly and silently. Report anything — a person reviews every report. End a check-in early right from the board, and edit your profile or delete your account anytime from the You tab.',
   },
 ];
 

@@ -42,14 +42,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="trips"
-        options={{
-          title: 'Your trips',
-          tabBarLabel: 'Trips',
-          tabBarIcon: ({ focused }) => <Glyph char="⇌" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
         name="connections"
         options={{
           title: 'Connections',
