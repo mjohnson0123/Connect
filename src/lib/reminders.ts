@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { TripPattern } from '../domain/types';
+import { formatDays } from './time';
 
 /**
  * Check-in window reminders — the trust-safe version of "how does Waze know."
@@ -26,10 +27,22 @@ export function remindersSupported(): boolean {
   return Platform.OS !== 'web';
 }
 
+/** Android 8+ delivers notifications through channels; without one they can
+ *  be silently dropped or buried. Idempotent — safe to call every time. */
+async function ensureChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('reminders', {
+    name: 'Check-in window reminders',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: [0, 200],
+  }).catch(() => {});
+}
+
 /** Request permission contextually (PRD §9.3) — only when the user flips the toggle. */
 export async function ensurePermission(): Promise<boolean> {
   if (!remindersSupported()) return false;
   try {
+    await ensureChannel();
     const current = await Notifications.getPermissionsAsync();
     if (current.granted) return true;
     const asked = await Notifications.requestPermissionsAsync();
@@ -42,10 +55,12 @@ export async function ensurePermission(): Promise<boolean> {
 /** Schedule one weekly reminder per pattern day, LEAD_MINUTES before the window opens. */
 export async function schedulePatternReminders(pattern: TripPattern): Promise<string[]> {
   if (!remindersSupported()) return [];
+  await ensureChannel();
   const [h, m] = pattern.windowStart.split(':').map(Number);
   const total = h * 60 + m - LEAD_MINUTES;
   const hour = ((Math.floor(total / 60) % 24) + 24) % 24;
   const minute = ((total % 60) + 60) % 60;
+  const channel = Platform.OS === 'android' ? { channelId: 'reminders' } : {};
 
   const ids: string[] = [];
   for (const day of pattern.daysOfWeek) {
@@ -60,6 +75,7 @@ export async function schedulePatternReminders(pattern: TripPattern): Promise<st
           weekday: day + 1, // expo-notifications: 1 = Sunday
           hour,
           minute,
+          ...channel,
         },
       });
       ids.push(id);
@@ -67,6 +83,24 @@ export async function schedulePatternReminders(pattern: TripPattern): Promise<st
       // Notification scheduling can be unavailable (e.g. Expo Go on Android);
       // the toggle simply stays off rather than crashing the flow.
     }
+  }
+
+  if (ids.length > 0) {
+    // Instant proof-of-life: reminders fire 15 min before the window on
+    // matching days, which can be days away — without this, a working toggle
+    // is indistinguishable from a broken one.
+    const lead = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Reminders are on',
+        body: `${pattern.routeOrLine} — you’ll get a nudge ${formatDays(pattern.daysOfWeek)} at ${lead}.`,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 5,
+        ...channel,
+      },
+    }).catch(() => {});
   }
   return ids;
 }

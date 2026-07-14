@@ -47,7 +47,7 @@ export default function HereNow() {
         <Field
           label="Airport or station code"
           value={code}
-          onChangeText={(t) => setCode(t.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase())}
+          onChangeText={(t) => setCode(t.replace(/[^A-Za-z0-9]/g, '').slice(0, 12).toUpperCase())}
           autoCapitalize="characters"
           placeholder="BWI"
         />
