@@ -57,7 +57,7 @@ export default function Board() {
               <BoardRow
                 key={pattern.id}
                 left={modeCode(pattern.mode)}
-                leftSub={`${pattern.windowStart}–${pattern.windowEnd}`}
+                leftSub={pattern.oneOff ? 'TODAY' : `${pattern.windowStart}–${pattern.windowEnd}`}
                 title={pattern.routeOrLine}
                 subtitle={
                   checkedIn

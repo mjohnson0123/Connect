@@ -32,7 +32,7 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
     glyph: '⇌',
     eyebrow: 'CHECK IN',
     title: 'Visible only when you say so',
-    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. It never uses your location, and it never runs in the background. Set a reminder and you’ll get a nudge before your usual travel time.',
+    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. Just passing through an airport today? “I’m here now” makes you discoverable across the whole place, then clears itself. Never your location, and never running in the background.',
   },
   {
     glyph: '◇',

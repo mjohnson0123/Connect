@@ -93,6 +93,7 @@ export default function RootLayout() {
         <Stack.Screen name="chat/[id]" options={{ title: 'Conversation' }} />
         <Stack.Screen name="meetup/[id]" options={{ title: 'Meetup verification' }} />
         <Stack.Screen name="add-pattern" options={{ presentation: 'modal', title: 'Add a trip pattern' }} />
+        <Stack.Screen name="here-now" options={{ presentation: 'modal', title: 'I’m here now' }} />
         <Stack.Screen name="report" options={{ presentation: 'modal', title: 'Report' }} />
         <Stack.Screen name="safety" options={{ title: 'Safety center' }} />
         <Stack.Screen name="density" options={{ title: 'Operator: density & reports' }} />

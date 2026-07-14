@@ -45,6 +45,8 @@ export interface TripPattern {
   windowStart: string;
   windowEnd: string;
   stationOrCode: string;
+  /** One-off "I'm here now" presence — auto-deleted after its check-in lapses. */
+  oneOff: boolean;
 }
 
 /** Ephemeral, opt-in, per-instance (PRD §5.3). Nothing is visible without one. */

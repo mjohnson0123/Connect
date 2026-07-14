@@ -91,9 +91,13 @@ export default function Trips() {
               <View key={p.id} style={styles.card}>
                 <BoardRow
                   left={modeCode(p.mode)}
-                  leftSub={`${p.windowStart}–${p.windowEnd}`}
+                  leftSub={p.oneOff ? 'TODAY' : `${p.windowStart}–${p.windowEnd}`}
                   title={p.routeOrLine}
-                  subtitle={[p.direction, formatDays(p.daysOfWeek), p.stationOrCode].filter(Boolean).join(' · ')}
+                  subtitle={
+                    p.oneOff
+                      ? 'One-time check-in · clears itself when it ends'
+                      : [p.direction, formatDays(p.daysOfWeek), p.stationOrCode].filter(Boolean).join(' · ')
+                  }
                   live={active}
                 />
                 <View style={styles.cardActions}>
@@ -104,6 +108,8 @@ export default function Trips() {
                       </Text>
                       <Button label="End check-in" variant="quiet" onPress={() => void endCheckIn(p.id)} />
                     </>
+                  ) : p.oneOff ? (
+                    <Text style={styles.emptyBody}>Ended — this clears off your board within the hour.</Text>
                   ) : (
                     <>
                       <Button
@@ -136,6 +142,11 @@ export default function Trips() {
           })
         )}
         <Button label="Add a trip pattern" variant="ink" onPress={() => router.push('/add-pattern')} />
+        <Button
+          label="Passing through somewhere today?"
+          variant="quiet"
+          onPress={() => router.push('/here-now')}
+        />
       </View>
     </Screen>
   );

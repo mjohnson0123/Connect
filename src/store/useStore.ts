@@ -121,6 +121,9 @@ interface AppState {
     daysOfWeek: number[]; windowStart: string; windowEnd: string; stationOrCode: string;
   }) => Promise<string | null>;
   removePattern: (id: string) => Promise<void>;
+  /** Transient presence: create (or reuse) a one-off place pattern and check
+   *  in atomically — for travelers passing through, not recurring routes. */
+  hereNow: (venue: string, code: string) => Promise<string | null>;
   checkIn: (patternId: string) => Promise<string | null>;
   endCheckIn: (patternId: string) => Promise<void>;
   loadPeople: (patternId: string) => Promise<void>;
@@ -183,6 +186,7 @@ function mapPattern(row: Record<string, unknown>): TripPattern {
     windowStart: row.window_start as string,
     windowEnd: row.window_end as string,
     stationOrCode: (row.station_or_code as string) ?? '',
+    oneOff: (row.one_off as boolean) ?? false,
   };
 }
 
@@ -514,6 +518,16 @@ export const useStore = create<AppState>()(
         const { [id]: _gone, ...reminders } = get().reminders;
         set({ reminders });
         await get().refresh();
+      },
+
+      hereNow: async (venue, code) => {
+        try {
+          const { error } = await supabase.rpc('one_off_check_in', { p_venue: venue, p_code: code });
+          await get().refresh();
+          return error ? friendlyError(error.message) : null;
+        } catch {
+          return 'No connection — try again when you’re back online.';
+        }
       },
 
       checkIn: async (patternId) => {
