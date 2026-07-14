@@ -59,21 +59,33 @@ export default function Connections() {
   return (
     <Screen>
       <View style={{ gap: space(6), paddingTop: space(2) }}>
-        {/* DISCOVER — search people by shared field. Initials only, no photo,
-            full profile info; identity reveals after mutual accept. */}
-        <View style={{ gap: space(2.5) }}>
-          <Text style={styles.section}>FIND PEOPLE IN YOUR FIELDS</Text>
+        {/* DISCOVER — the tab's anchor. No query: people who share your
+            fields. With a query: searches EVERY field, headline, and bio —
+            not just your own tags. Initials only; identity reveals after
+            mutual accept. */}
+        <View style={{ gap: space(3) }}>
+          <Text style={styles.discoverTitle}>Find your people</Text>
+          <Text style={styles.discoverSub}>
+            Search any field — yours, or one you’re curious about.
+          </Text>
           <Field
             value={query}
             onChangeText={setQuery}
-            placeholder="Search by field or role — e.g. Finance, designer"
+            placeholder="Try “Finance”, “design”, “law”…"
             autoCapitalize="none"
+            style={styles.searchInput}
           />
+          {query.trim() && discoverPeople.length > 0 ? (
+            <Text style={styles.resultCount}>
+              {discoverPeople.length} {discoverPeople.length === 1 ? 'PERSON' : 'PEOPLE'} · “
+              {query.trim().toUpperCase()}”
+            </Text>
+          ) : null}
           {discoverPeople.length === 0 ? (
             <Text style={styles.emptyLine}>
               {query
-                ? 'Nobody matches that yet — try a broader field.'
-                : 'Matches share at least one of your fields. Add more industries on your profile to widen this.'}
+                ? 'Nobody in that field yet — try a broader term.'
+                : 'People who share your fields appear here. Search to reach any field on the platform.'}
             </Text>
           ) : (
             discoverPeople.map((p) => (
@@ -177,6 +189,15 @@ export default function Connections() {
 
 const styles = StyleSheet.create({
   section: { ...type.monoSmall, color: color.textMutedOnChalk },
+  discoverTitle: { ...type.title, color: color.textOnChalk },
+  discoverSub: { ...type.body, color: color.textMutedOnChalk, marginTop: -space(1.5) },
+  searchInput: {
+    fontSize: 16,
+    paddingVertical: space(3.5),
+    borderWidth: 1.5,
+    borderColor: color.ink,
+  },
+  resultCount: { ...type.monoSmall, color: color.amberTextOnChalk },
   emptyLine: { ...type.caption, color: color.textMutedOnChalk },
   discoverCard: {
     backgroundColor: color.chalkRaised,

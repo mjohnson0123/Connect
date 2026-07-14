@@ -58,10 +58,24 @@ export default function You() {
 
         {me.bio ? <Text style={styles.bio}>{me.bio}</Text> : null}
 
-        <View style={styles.chips}>
-          {me.reasonTags.map((t) => (
-            <Chip key={t} label={reasonLabel(t)} />
-          ))}
+        {me.industryTags.length > 0 ? (
+          <View style={{ gap: space(2) }}>
+            <Text style={styles.section}>YOUR FIELDS</Text>
+            <View style={styles.chips}>
+              {me.industryTags.map((t) => (
+                <Chip key={t} label={t} selected />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        <View style={{ gap: space(2) }}>
+          <Text style={styles.section}>LOOKING FOR</Text>
+          <View style={styles.chips}>
+            {me.reasonTags.map((t) => (
+              <Chip key={t} label={reasonLabel(t)} />
+            ))}
+          </View>
         </View>
 
         <Button label="Edit profile" variant="quiet" onPress={() => router.push('/onboarding/profile')} />
