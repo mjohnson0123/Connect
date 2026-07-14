@@ -4,6 +4,8 @@
     "strict": true
   },
   "exclude": [
-    "scripts"
+    "scripts",
+    "supabase/functions",
+    "src/liveness-web"
   ]
 }

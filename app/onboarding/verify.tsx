@@ -1,53 +1,36 @@
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useCameraPermissions } from 'expo-camera';
 import { useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import Screen from '../../src/components/Screen';
 import { Button } from '../../src/components/ui';
 import { chooseProfilePhoto } from '../../src/lib/photoPicker';
+import { LIVENESS_HTML } from '../../src/generated/livenessHtml';
 import { useStore } from '../../src/store/useStore';
-import { color, radius, space, type } from '../../src/theme/tokens';
+import { color, space, type } from '../../src/theme/tokens';
 
 /**
- * Selfie liveness verification (PRD §5.1) — the rideshare-driver pattern.
- * Camera permission is requested here, contextually, not at onboarding start
- * (PRD §9.3). The demo build simulates the liveness service; the capture is
- * discarded after the check — only the verification status is kept.
+ * Selfie liveness verification (PRD §5.1) — the rideshare-driver pattern,
+ * now backed by AWS Rekognition Face Liveness. The official AWS web detector
+ * runs in a WebView (AWS ships no React Native component); sessions are
+ * created and scored server-side by the liveness Edge Function, which is the
+ * only path to verified status. Camera permission is requested here,
+ * contextually, not at onboarding start (PRD §9.3). The web preview build
+ * keeps the simulated path (no camera streaming in that environment).
  */
 export default function Verify() {
   const router = useRouter();
   const submitVerification = useStore((s) => s.submitVerification);
+  const startLiveness = useStore((s) => s.startLiveness);
+  const finishLiveness = useStore((s) => s.finishLiveness);
   const setAvatarFromBase64 = useStore((s) => s.setAvatarFromBase64);
   const [permission, requestPermission] = useCameraPermissions();
-  const [phase, setPhase] = useState<'intro' | 'camera' | 'checking' | 'photo' | 'done'>('intro');
+  const [phase, setPhase] = useState<'intro' | 'liveness' | 'checking' | 'photo' | 'done'>('intro');
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
-
-  const finish = async (imageBase64: string | null) => {
-    setPhase('checking');
-    setError(null);
-    // The selfie uploads to a private storage bucket and a verification row
-    // is recorded server-side. Liveness scoring is the vendor integration
-    // that slots in next; the storage + record pipeline is real now.
-    const err = await submitVerification(imageBase64);
-    if (err) {
-      setError(err);
-      setPhase('intro');
-      return;
-    }
-    if (imageBase64) {
-      // One capture, two jobs: offer the verified selfie as the profile
-      // photo. The photo shown on profiles is guaranteed to be the person
-      // who passed verification — nobody can upload a face that isn't them.
-      setCaptured(imageBase64);
-      setPhase('photo');
-      return;
-    }
-    setPhase('done');
-    setTimeout(() => router.replace('/onboarding/profile'), 900);
-  };
 
   const proceed = () => {
     setCaptured(null);
@@ -80,26 +63,100 @@ export default function Verify() {
     proceed();
   };
 
-  const capture = async () => {
-    let base64: string | null = null;
-    try {
-      const photo = await cameraRef.current?.takePictureAsync({ base64: true, quality: 0.6 });
-      base64 = photo?.base64 ?? null;
-    } catch {
-      // Capture can fail on simulators — submit without an image rather than dead-end.
+  const scoreSession = async (id: string) => {
+    setPhase('checking');
+    const result = await finishLiveness(id);
+    if (result.error) {
+      setError(result.error);
+      setPhase('intro');
+      return;
     }
-    await finish(base64);
+    if (!result.verified) {
+      setError(
+        'We couldn’t confirm a live face this time. Find even lighting, hold the phone at eye level, and try again.',
+      );
+      setPhase('intro');
+      return;
+    }
+    if (result.referenceImage) {
+      // One capture, two jobs: offer the verified frame as the profile photo.
+      // A photo shown on a profile is guaranteed to be the person who passed
+      // the check — nobody can upload a face that isn't them.
+      setCaptured(result.referenceImage);
+      setPhase('photo');
+      return;
+    }
+    proceed();
+  };
+
+  const onWebViewMessage = (e: WebViewMessageEvent) => {
+    let msg: { type?: string; message?: string } = {};
+    try {
+      msg = JSON.parse(e.nativeEvent.data);
+    } catch {
+      return;
+    }
+    if (msg.type === 'complete' && sessionId) void scoreSession(sessionId);
+    if (msg.type === 'cancel') setPhase('intro');
+    if (msg.type === 'error') {
+      setError('The face check hit a snag. Check your connection and try again.');
+      setPhase('intro');
+    }
   };
 
   const start = async () => {
+    setError(null);
     if (Platform.OS === 'web') {
-      // Web preview build: camera capture isn't part of the product surface.
-      await finish(null);
+      // Web preview build: no camera streaming here; the simulated path keeps
+      // onboarding walkable until the kill switch flips at launch.
+      setPhase('checking');
+      const err = await submitVerification(null);
+      if (err) {
+        setError(err);
+        setPhase('intro');
+        return;
+      }
+      proceed();
       return;
     }
+    // The WebView can only use the camera if the app itself holds the
+    // permission — request it before opening the detector.
     const res = permission?.granted ? permission : await requestPermission();
-    if (res?.granted) setPhase('camera');
+    if (!res?.granted) return;
+    setBusy(true);
+    const session = await startLiveness();
+    setBusy(false);
+    if (session.error || !session.sessionId) {
+      setError(session.error ?? 'Couldn’t start the face check.');
+      return;
+    }
+    setSessionId(session.sessionId);
+    setPhase('liveness');
   };
+
+  if (phase === 'liveness') {
+    const html = LIVENESS_HTML.replace('__SESSION_ID__', sessionId ?? '')
+      .replace('__REGION__', process.env.EXPO_PUBLIC_AWS_REGION ?? 'us-east-1')
+      .replace('__IDENTITY_POOL_ID__', process.env.EXPO_PUBLIC_AWS_IDENTITY_POOL_ID ?? '');
+    return (
+      <View style={{ flex: 1, backgroundColor: color.ink }}>
+        <WebView
+          source={{ html, baseUrl: 'https://localhost' }}
+          originWhitelist={['*']}
+          javaScriptEnabled
+          domStorageEnabled
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          mediaCapturePermissionGrantType="grant"
+          onMessage={onWebViewMessage}
+          style={{ flex: 1, backgroundColor: color.ink }}
+        />
+        <View style={{ padding: space(4), backgroundColor: color.ink }}>
+          <Button label="Cancel" variant="quietOnInk" onPress={() => setPhase('intro')} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Screen scroll={false}>
@@ -108,11 +165,12 @@ export default function Verify() {
           <View style={{ gap: space(4) }}>
             <Text style={styles.title}>Everyone here is a real person</Text>
             <Text style={styles.body}>
-              Take a quick selfie so we can confirm your profile photo is really you —
-              the same check rideshare drivers pass. Your selfie is used only for this
-              verification and is deleted as soon as it completes.
+              A quick face check confirms there’s a live person behind this profile — the
+              same check rideshare drivers pass. You’ll center your face in an oval for a
+              few seconds. The check runs on Amazon’s verification service; your face
+              data is used only for this check.
             </Text>
-            <Button label="Take selfie" onPress={start} />
+            <Button label={busy ? 'Starting…' : 'Start face check'} onPress={() => void start()} disabled={busy} />
             {error ? <Text style={styles.caution}>{error}</Text> : null}
             {permission && !permission.granted && !permission.canAskAgain ? (
               <Text style={styles.caution}>
@@ -123,20 +181,10 @@ export default function Verify() {
           </View>
         )}
 
-        {phase === 'camera' && (
-          <View style={{ gap: space(4), flex: 1 }}>
-            <View style={styles.cameraFrame}>
-              <CameraView ref={cameraRef} style={styles.camera} facing="front" />
-            </View>
-            <Text style={styles.body}>Center your face and hold still.</Text>
-            <Button label="Capture" onPress={() => void capture()} />
-          </View>
-        )}
-
         {phase === 'checking' && (
           <View style={{ gap: space(4), alignItems: 'center' }}>
             <ActivityIndicator color={color.ink} size="large" />
-            <Text style={styles.mono}>RUNNING LIVENESS CHECK…</Text>
+            <Text style={styles.mono}>CONFIRMING LIVENESS…</Text>
           </View>
         )}
 
@@ -146,7 +194,7 @@ export default function Verify() {
               <Image
                 source={{ uri: `data:image/jpeg;base64,${captured}` }}
                 style={styles.photoPreview}
-                accessibilityLabel="Your verified selfie"
+                accessibilityLabel="Your verified photo"
               />
             ) : null}
             <Text style={styles.title}>Use this photo on your profile?</Text>
@@ -166,7 +214,6 @@ export default function Verify() {
               <Text style={styles.verifiedMark}>✓</Text>
             </View>
             <Text style={[styles.mono, { color: color.signal }]}>VERIFIED</Text>
-            <Text style={styles.body}>Verification image deleted.</Text>
           </View>
         )}
       </View>
@@ -189,14 +236,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: color.signal,
   },
-  cameraFrame: {
-    flex: 1,
-    maxHeight: 420,
-    borderRadius: radius.card,
-    overflow: 'hidden',
-    backgroundColor: color.ink,
-  },
-  camera: { flex: 1 },
   verifiedRing: {
     width: 88,
     height: 88,

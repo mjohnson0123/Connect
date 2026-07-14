@@ -102,6 +102,12 @@ interface AppState {
   changePassword: (newPassword: string) => Promise<string | null>;
   /** Uploads the selfie to private storage and records the verification. */
   submitVerification: (imageBase64: string | null) => Promise<string | null>;
+  /** Opens a Rekognition Face Liveness session via the liveness Edge Function. */
+  startLiveness: () => Promise<{ sessionId?: string; error?: string }>;
+  /** Fetches the scored liveness result; the server applies verified status. */
+  finishLiveness: (
+    sessionId: string,
+  ) => Promise<{ verified: boolean; referenceImage: string | null; error?: string }>;
   /** Opt-in: publish the verified selfie as the profile photo. */
   setAvatarFromBase64: (imageBase64: string) => Promise<string | null>;
   completeVerification: () => Promise<void>;
@@ -404,6 +410,34 @@ export const useStore = create<AppState>()(
         if (error) return error.message;
         await get().refresh();
         return null;
+      },
+
+      startLiveness: async () => {
+        const { data, error } = await supabase.functions.invoke('liveness', {
+          body: { action: 'create' },
+        });
+        if (error || !data?.sessionId) {
+          return { error: 'Couldn’t start the face check. Give it another try in a moment.' };
+        }
+        return { sessionId: data.sessionId as string };
+      },
+
+      finishLiveness: async (sessionId) => {
+        const { data, error } = await supabase.functions.invoke('liveness', {
+          body: { action: 'result', sessionId },
+        });
+        if (error || typeof data?.verified !== 'boolean') {
+          return {
+            verified: false,
+            referenceImage: null,
+            error: 'Couldn’t confirm the face check. Give it another try in a moment.',
+          };
+        }
+        if (data.verified) await get().refresh();
+        return {
+          verified: data.verified as boolean,
+          referenceImage: (data.referenceImage as string | null) ?? null,
+        };
       },
 
       setAvatarFromBase64: async (imageBase64) => {

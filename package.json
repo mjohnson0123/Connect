@@ -20,17 +20,21 @@
     "expo-router": "~57.0.4",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
-    "react-dom": "^19.2.3",
     "react-native": "0.86.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "^4.25.2",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "^0.21.2",
+    "react-native-webview": "^13.16.1",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@aws-amplify/ui-react": "^6.15.4",
+    "@aws-amplify/ui-react-liveness": "^3.6.7",
     "@types/react": "~19.2.2",
+    "aws-amplify": "^6.18.0",
     "esbuild": "^0.28.1",
+    "react-dom": "^19.2.3",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -39,6 +43,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "build:liveness-web": "node scripts/build-liveness-web.mjs",
     "test": "esbuild scripts/logic.test.ts --bundle --platform=node --format=cjs --outfile=logic.test.cjs && node --test logic.test.cjs && rm -f logic.test.cjs"
   },
   "private": true
