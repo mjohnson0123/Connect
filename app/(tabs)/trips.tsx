@@ -78,7 +78,7 @@ export default function Trips() {
       <View style={{ gap: space(2.5), paddingTop: space(2) }}>
         {board.length === 0 ? (
           <View style={{ gap: space(4), paddingTop: space(8) }}>
-            <Text style={styles.emptyTitle}>Declare a recurring trip</Text>
+            <Text style={styles.emptyTitle}>Add a trip you take regularly</Text>
             <Text style={styles.emptyBody}>
               “MARC Penn Line, Baltimore → DC, weekday mornings.” A pattern is just a
               declaration — you stay invisible until you check in.

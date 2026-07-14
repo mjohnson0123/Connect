@@ -25,14 +25,14 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
   {
     glyph: '▤',
     eyebrow: 'THE BOARD',
-    title: 'Declare the trips you already take',
+    title: 'Add the trips you already take',
     body: 'A train line, a flight route, a terminal you pass through. Your board reads like a departure board — each row is a route you ride, and how many people on it are open to talking.',
   },
   {
     glyph: '⇌',
     eyebrow: 'CHECK IN',
     title: 'Visible only when you say so',
-    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. Never your location, never always-on. Set a reminder and the app nudges you before your window opens.',
+    body: 'Tap “I’m traveling now” and you’re discoverable to people on that route — for up to 3 hours, ending automatically. It never uses your location, and it never runs in the background. Set a reminder and you’ll get a nudge before your usual travel time.',
   },
   {
     glyph: '◇',
@@ -44,7 +44,7 @@ const SLIDES: { glyph: string; eyebrow: string; title: string; body: string }[] 
     glyph: '#',
     eyebrow: 'MEET SAFELY',
     title: 'Chat in-app, verify in person',
-    body: 'Conversations stay text-only in the app, with contact info blocked both ways. Meeting up? One of you shows a 6-digit code, the other types it in — so you know it’s really them.',
+    body: 'Conversations stay text-only in the app — phone numbers and emails can’t be sent, by either of you. Meeting up? One of you shows a 6-digit code, the other types it in — so you know it’s really them.',
   },
   {
     glyph: '●',
