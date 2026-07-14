@@ -34,45 +34,44 @@ export const modeCode = (mode: TravelMode) =>
  * field if they pick the exact same label. Keep these stable once shipped —
  * they're matching keys, not just display strings.
  */
-export const INDUSTRIES: string[] = [
-  'Software Engineering',
-  'Data & AI',
-  'Product Management',
-  'Design & UX',
-  'Technology (other)',
-  'Finance',
-  'Banking & Investment',
-  'Accounting',
-  'Consulting',
-  'Legal',
-  'Healthcare',
-  'Biotech & Pharma',
-  'Government & Policy',
-  'Nonprofit',
-  'Education',
-  'Academia & Research',
-  'Marketing',
-  'Sales',
-  'Media & Journalism',
-  'Entertainment',
-  'Arts & Culture',
-  'Real Estate',
-  'Architecture',
-  'Engineering (non-software)',
-  'Manufacturing',
-  'Energy',
-  'Transportation & Logistics',
-  'Retail & E-commerce',
-  'Hospitality',
-  'Human Resources',
-  'Operations',
-  'Entrepreneurship',
-  'Aerospace & Defense',
-  'Construction',
-  'Insurance',
-  'Telecommunications',
-  'Sports',
+/** Fields grouped for the picker UI. The strings are the canonical tag
+ *  values stored on profiles — regroup freely, never rename casually. */
+export const INDUSTRY_GROUPS: { label: string; fields: string[] }[] = [
+  {
+    label: 'Tech & Data',
+    fields: ['Software Engineering', 'Data & AI', 'Product Management', 'Design & UX', 'Technology (other)', 'Telecommunications'],
+  },
+  {
+    label: 'Business & Finance',
+    fields: ['Finance', 'Banking & Investment', 'Accounting', 'Consulting', 'Insurance', 'Entrepreneurship', 'Operations', 'Human Resources', 'Sales', 'Marketing'],
+  },
+  {
+    label: 'Law & Public Sector',
+    fields: ['Legal', 'Government & Policy', 'Nonprofit'],
+  },
+  {
+    label: 'Health & Science',
+    fields: ['Healthcare', 'Biotech & Pharma'],
+  },
+  {
+    label: 'Education & Research',
+    fields: ['Education', 'Academia & Research'],
+  },
+  {
+    label: 'Media & Creative',
+    fields: ['Media & Journalism', 'Entertainment', 'Arts & Culture', 'Sports'],
+  },
+  {
+    label: 'Industry & Infrastructure',
+    fields: ['Engineering (non-software)', 'Manufacturing', 'Energy', 'Transportation & Logistics', 'Construction', 'Architecture', 'Real Estate', 'Aerospace & Defense'],
+  },
+  {
+    label: 'Consumer & Services',
+    fields: ['Retail & E-commerce', 'Hospitality'],
+  },
 ];
+
+export const INDUSTRIES: string[] = INDUSTRY_GROUPS.flatMap((g) => g.fields);
 
 /** Max industries a profile can select — keeps matching meaningful, not noisy. */
 export const MAX_INDUSTRIES = 5;

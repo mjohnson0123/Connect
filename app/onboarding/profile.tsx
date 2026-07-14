@@ -5,7 +5,8 @@ import Screen from '../../src/components/Screen';
 import { Avatar, Button, Chip, Field } from '../../src/components/ui';
 import { chooseProfilePhoto } from '../../src/lib/photoPicker';
 import { ReasonTag } from '../../src/domain/types';
-import { INDUSTRIES, LIMITS, MAX_INDUSTRIES, REASON_TAGS } from '../../src/domain/vocab';
+import FieldPicker from '../../src/components/FieldPicker';
+import { LIMITS, MAX_INDUSTRIES, REASON_TAGS } from '../../src/domain/vocab';
 import { useStore } from '../../src/store/useStore';
 import { color, space, type } from '../../src/theme/tokens';
 
@@ -33,6 +34,7 @@ export default function ProfileSetup() {
   const [headline, setHeadline] = useState(me?.headline ?? '');
   const [bio, setBio] = useState(me?.bio ?? '');
   const [industries, setIndustries] = useState<string[]>(me?.industryTags ?? []);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [reasons, setReasons] = useState<ReasonTag[]>(me?.reasonTags ?? []);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -117,13 +119,26 @@ export default function ProfileSetup() {
           />
         </View>
         <View style={{ gap: space(2.5) }}>
-          <Text style={styles.label}>INDUSTRIES & FIELDS · {industries.length}/{MAX_INDUSTRIES}</Text>
+          <Text style={styles.label}>YOUR FIELDS · {industries.length}/{MAX_INDUSTRIES}</Text>
           <View style={styles.chips}>
-            {INDUSTRIES.map((f) => (
-              <Chip key={f} label={f} selected={industries.includes(f)} onPress={() => toggleIndustry(f)} />
+            {industries.map((f) => (
+              <Chip key={f} label={f} selected onPress={() => toggleIndustry(f)} />
             ))}
+            <Chip
+              label={industries.length === 0 ? '+ Add your fields' : '+ Add'}
+              onPress={() => setPickerOpen(true)}
+            />
           </View>
+          {industries.length > 0 ? (
+            <Text style={styles.note}>Tap a field to remove it.</Text>
+          ) : null}
         </View>
+        <FieldPicker
+          visible={pickerOpen}
+          selected={industries}
+          onToggle={toggleIndustry}
+          onClose={() => setPickerOpen(false)}
+        />
         <View style={{ gap: space(2.5) }}>
           <Text style={styles.label}>WHY YOU’RE HERE</Text>
           <View style={styles.chips}>

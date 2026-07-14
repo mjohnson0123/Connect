@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { filterMessage } from '../src/lib/contentFilter';
 import { flightRoute, groundRoute, IATA, normalizeText, placeRoute, routeKeyFor } from '../src/domain/routes';
+import { INDUSTRIES, INDUSTRY_GROUPS } from '../src/domain/vocab';
 import { nextRoute } from '../src/lib/routeGate';
 import { formatClock, formatDays, formatRemaining, HOUR, MINUTE } from '../src/lib/time';
 
@@ -161,6 +162,16 @@ test('gate: signed out goes to welcome; loading state redirects nowhere', () => 
   assert.equal(
     nextRoute({ myId: 'u1', hasProfile: false, verified: false, hasDisplayName: false, tourSeen: false }),
     null,
+  );
+});
+
+// ── Vocabulary: tags are stored on profiles — groups must never mutate them ──
+test('industry groups preserve the canonical tag set (no drops, no dupes)', () => {
+  assert.equal(INDUSTRIES.length, 37);
+  assert.equal(new Set(INDUSTRIES).size, 37);
+  assert.equal(
+    INDUSTRY_GROUPS.reduce((n, g) => n + g.fields.length, 0),
+    INDUSTRIES.length,
   );
 });
 
