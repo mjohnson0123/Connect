@@ -32,8 +32,9 @@ travelers; positioning, copy, and possibly the name should grow to match. See
 §11 for this and the enterprise dimension, which are the two biggest strategic
 levers.
 
-**Founder:** MJ (johnsonmalcolm0123@gmail.com), non-technical, builds and tests
-phone-only on Android (no PC).
+**Founder:** MJ (johnsonmalcolm0123@gmail.com), non-technical founder driving
+product and testing. Hands-on testing to date has been primarily on an Android
+device; a full development machine is also available (see §9).
 
 ---
 
@@ -253,10 +254,17 @@ are expected — those RPCs are meant to be callable and enforce auth internally
 
 ---
 
-## 9. Testing (phone-only, no PC)
+## 9. Testing
 
-- **Install:** GitHub Actions → "Build DEV/Android APK (EAS)" workflow (needs
-  `EXPO_TOKEN` repo secret) → download APK from expo.dev → install on Android.
+Much of the workflow to date was designed around on-device Android testing
+(cloud builds, SQL-paste), but a development machine is available too, which
+unlocks faster local iteration (local Expo dev server, running the app in a
+browser/emulator, the Supabase CLI for migrations, two-account testing). The
+exact dev-machine OS/capabilities should be confirmed and this section updated.
+
+- **Install (device):** GitHub Actions → "Build DEV/Android APK (EAS)" workflow
+  (needs `EXPO_TOKEN` repo secret) → download APK from expo.dev → install on
+  Android.
 - **Backend/logic verification:** `npm test` (22 unit tests: content filter,
   route-key convergence, onboarding gate, place matching), `npx tsc --noEmit`,
   `CI=1 npx expo export -p web`, plus browser smoke tests via Playwright.
