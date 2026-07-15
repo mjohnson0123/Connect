@@ -22,6 +22,16 @@ route you chose to declare, and you're invisible unless you opt in. The core
 promise is **trust** — real, verified humans; opt-in visibility; no
 solicitation.
 
+**Positioning — "commuters" is the seed, "travelers" is the market.** The name
+says commuter, but the real user is **any professional in transit**: the daily
+train rider *and* the consultant flying to a client, the conference-goer, the
+person on a layover. Travel is arguably a *higher-intent* networking moment than
+a commute — people on the road are away from their usual network and more open
+to connecting. The one-off "I'm here now" and flight features already serve
+travelers; positioning, copy, and possibly the name should grow to match. See
+§11 for this and the enterprise dimension, which are the two biggest strategic
+levers.
+
 **Founder:** MJ (johnsonmalcolm0123@gmail.com), non-technical, builds and tests
 phone-only on Android (no PC).
 
@@ -278,7 +288,79 @@ AWS identity pool ID, `google-services.json`) are safe to commit.
 
 ---
 
-## 11. Current state & gaps (as of 2026-07-15)
+## 11. Strategic direction — travelers & enterprise
+
+_The two biggest expansion levers. Neither is built yet; both are shaped by
+decisions made now, so the architecture must not foreclose them._
+
+### 11a. From commuters to travelers (positioning)
+The product is framed around daily commuters, but the addressable market is
+**professionals in transit** — anyone whose work moves them through shared
+travel infrastructure. A train regular and a business traveler are the same
+user: predictable place, predictable time, open to a professional conversation.
+Business trips, conferences, flights, and layovers are arguably *higher-intent*
+than a commute — travelers are away from their normal network and more receptive.
+The one-off "I'm here now," the flight mode, and the flight→airport bridge
+already serve this. What should catch up: copy, marketing positioning, and a
+decision on the name ("Commuter Connect" as an umbrella vs. a broader
+"traveler" brand — open strategic question, not yet decided).
+
+### 11b. Enterprise / corporate identity (the biggest expansion)
+**The insight.** At any large company, employees constantly cross paths in
+travel hubs without knowing it. Amazon has ~1.5M employees; on any given day
+thousands are in airports, lounges, and terminals — often people in different
+business units, geographies, or levels who would benefit from meeting but never
+will. A verified corporate-identity layer turns "a stranger who shares my route"
+into "a colleague from my own company I didn't know was here."
+
+**The feature.** Verify a corporate email / SSO **in addition to** the face
+check, unlocking a **same-company discovery dimension** layered on the existing
+route/place matching. In a BWI lounge you could see fellow verified employees of
+your company checked in nearby and connect across teams and levels you'd never
+otherwise reach.
+
+**Why it's powerful:**
+- **Stronger trust anchor.** Shared verified employment is an even stronger
+  signal than a shared route — it may justify richer within-company profiles
+  (first name, team, role) while keeping the same opt-in, location-free presence.
+- **Built-in liquidity.** Large orgs bring their own network density; a
+  100k-person company seeds the graph instantly, sidestepping the cold-start
+  problem consumer networks die from.
+- **B2B wedge / monetization.** Flips a consumer app into B2B2C: enterprises pay
+  for internal-networking-in-transit — valuable for large, distributed,
+  remote-first, or travel-heavy orgs (consultancies, big tech, sales orgs). This
+  is the revenue story a consumer trust network usually lacks.
+- **Investor-shaped.** A consumer trust-first network *plus* a clear enterprise
+  wedge is a stronger narrative than either alone.
+
+**How it integrates technically (sketch, not built):**
+- **Identity** — a second, orthogonal verification alongside the face check:
+  "real human" (Rekognition) + "verified employee of X." Start with corporate
+  **email-domain** verification (send a link to the work email via the existing
+  Resend integration, extract the domain → map to a company). Graduate to
+  proper enterprise **SSO** (SAML / OIDC via Okta, Microsoft Entra, Google
+  Workspace) for paying customers.
+- **Data model** — a `companies` table; a verified `company_id` / domain on
+  profiles (a protected column, set only by the verification path).
+- **Matching** — "same company" becomes a new filter dimension on
+  `discover_people` / `route_people`, orthogonal to route/place. The user picks
+  a visibility scope: everyone on my route, only same-company, or both.
+- **Privacy** — anonymity-until-accept stays the default; within-company
+  discovery *may* be configured more openly because employment is the trust
+  anchor, but presence stays opt-in and location-free. The core promises don't
+  bend for the enterprise tier.
+- **Admin** — enterprise customers will likely want an org console (seats,
+  verified domains, policy); a later, sales-driven build.
+
+**Sequencing.** Post-beta and strategic: validate the consumer trust loop first,
+then layer enterprise as the liquidity + monetization engine. But because the
+route/place matching, verification pipeline, opt-in presence model, and Resend
+email are already in place, the groundwork points straight at it — today's
+schema and product decisions should keep it cheap to add.
+
+---
+
+## 12. Current state & gaps (as of 2026-07-15)
 
 **Verified working (live-checked):** full backend migrated; real face
 verification; retention sweep on pg_cron; push pipeline wired and one device
@@ -311,6 +393,9 @@ once the gaps below close; not yet ready for strangers or app-store launch.
   backups, no auto-pause). Free-tier projects pause after 7 days idle.
 
 **Roadmap / deferred (not beta-blocking):**
+- **Enterprise / corporate identity and the traveler reframe — see §11.** The
+  two biggest strategic levers (same-company discovery via corporate SSO; broaden
+  from commuters to all travelers). Post-beta, but architecture-shaping.
 - iOS via TestFlight (needs Apple enrollment).
 - Google + Apple sign-in (must ship together per Apple rules).
 - Dev/prod environment split (plan written; prod DB created at launch; separate
@@ -322,7 +407,7 @@ once the gaps below close; not yet ready for strangers or app-store launch.
 
 ---
 
-## 12. Environment & workflow notes
+## 13. Environment & workflow notes
 
 - The build/test container's proxy blocks `supabase.co`, `api.expo.dev`, and
   similar — so backend verification is done via SQL and the Supabase MCP
@@ -336,7 +421,7 @@ once the gaps below close; not yet ready for strangers or app-store launch.
 
 ---
 
-## 13. Glossary
+## 14. Glossary
 
 - **rkey** — canonical route key; two identical rkeys match.
 - **Check-in** — explicit, 3-hour, expiring visibility on a route.
@@ -346,5 +431,8 @@ once the gaps below close; not yet ready for strangers or app-store launch.
   reports.
 - **The bridge** — offer, at flight check-in, to also check in at the departure
   airport (venue-wide, opt-in, expires on its own).
+- **Same-company discovery** (roadmap, §11b) — a future match dimension: verified
+  corporate identity lets colleagues from the same company find each other in
+  travel hubs, orthogonal to route/place matching.
 - **Split-flap** — the departure-board flip animation, used at check-in, match,
   and PIN reveal only.
